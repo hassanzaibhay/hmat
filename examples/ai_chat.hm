@@ -1,0 +1,132 @@
+# AI Chat — Phase 3 milestone example.
+# Demonstrates: ai model declaration, await, error handling, pipelines.
+# This is the example that proves HMAT's AI-native promise.
+#
+# Compile: hmatc ai_chat.hm
+# Run:     ANTHROPIC_API_KEY=your_key ./ai_chat
+
+import hmat::io
+from hmat::ai import ChatMessage
+
+# Declare an AI model — first-class language construct
+ai model assistant = load("anthropic/claude-3-5-sonnet"):
+    temperature: 0.7
+    max_tokens: 1024
+    system: "You are a helpful assistant. Be concise."
+
+# Simple chat function
+async fn ask(question: str) -> Result<str, AiError>:
+    let reply = await assistant.chat(question)?
+    return Ok(reply)
+
+# Multi-turn conversation
+async fn demo_conversation():
+    let history: [ChatMessage] = []
+
+    let questions = [
+        "What is HMAT?",
+        "What makes it AI-native?",
+        "Give me one HMAT code example."
+    ]
+
+    for question in questions:
+        print(f"\nYou: {question}")
+
+        history.push(ChatMessage { role: "user", content: question })
+
+        match await assistant.chat_history(history):
+            Ok(reply):
+                print(f"AI: {reply}")
+                history.push(ChatMessage { role: "assistant", content: reply })
+            Err(AiError.Timeout):
+                print("The AI timed out. Moving on.")
+            Err(AiError.RateLimited { retry_after }):
+                print(f"Rate limited. Retry in {retry_after}s.")
+                break
+            Err(e):
+                print(f"Error: {e}")
+                break
+
+# Structured data extraction
+struct CodeReview:
+    has_bugs: bool
+    suggestions: [str]
+    quality_score: int    # 1-10
+
+async fn review_code(code: str) -> Result<CodeReview, AiError>:
+    let review: CodeReview = await assistant.extract::<CodeReview>(
+        f"Review this code and return structured feedback:\n\n{code}"
+    )?
+    return Ok(review)
+
+# Pipeline example — text analysis
+ai model analyzer = load("anthropic/claude-haiku-4-5"):
+    temperature: 0.0    # deterministic
+
+pipeline analyze_sentiment:
+    input -> analyzer.classify(labels: ["positive", "negative", "neutral"]) -> output
+
+async fn demo_pipeline():
+    let feedbacks = [
+        "HMAT is amazing! Best language ever.",
+        "I found a bug in the compiler.",
+        "Decent language, needs more documentation."
+    ]
+
+    print("\n=== Sentiment Analysis Pipeline ===")
+    for feedback in feedbacks:
+        match await analyze_sentiment.run(feedback):
+            Ok(sentiment) -> print(f"'{feedback}' -> {sentiment}")
+            Err(e)        -> print(f"Failed: {e}")
+
+# Error handling patterns
+async fn demo_error_handling():
+    print("\n=== Error Handling ===")
+
+    # Using ? to propagate
+    fn process_with_ai(text: str) -> Result<str, AiError>:
+        let summary = await assistant.summarize(text)?
+        let sentiment = await analyze_sentiment.run(summary)?
+        return Ok(f"{sentiment}: {summary}")
+
+    match process_with_ai("HMAT is a new programming language built for the AI era."):
+        Ok(result) -> print(f"Result: {result}")
+        Err(e)     -> print(f"Processing failed: {e}")
+
+# Parallel AI calls
+async fn demo_parallel():
+    print("\n=== Parallel AI Calls ===")
+
+    # Sequential (slow)
+    # let a = await assistant.chat("Question 1")?
+    # let b = await assistant.chat("Question 2")?
+
+    # Parallel (fast) — both calls happen at the same time
+    from hmat::async import join
+
+    match await join(
+        assistant.chat("In one word, describe Python."),
+        assistant.chat("In one word, describe Rust."),
+        assistant.chat("In one word, describe HMAT.")
+    ):
+        Ok((python, rust, hmat)):
+            print(f"Python: {python}")
+            print(f"Rust:   {rust}")
+            print(f"HMAT:   {hmat}")
+        Err(e):
+            print(f"One of the calls failed: {e}")
+
+async fn main():
+    print("=== HMAT AI Chat Demo ===")
+
+    # Simple question
+    match await ask("What is 2 + 2? Just the number."):
+        Ok(answer) -> print(f"AI says: {answer}")
+        Err(e)     -> print(f"Failed: {e}")
+
+    await demo_conversation()
+    await demo_pipeline()
+    await demo_error_handling()
+    await demo_parallel()
+
+    print("\n=== Done ===")

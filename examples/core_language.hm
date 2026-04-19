@@ -1,0 +1,170 @@
+# Core Language Features — Phase 2 milestone example.
+# Demonstrates: variables, functions, structs, enums, pattern matching,
+#               generics, Result/Option, closures, iterators.
+#
+# Compile: hmatc core_language.hm
+# Run:     ./core_language
+
+# --- Variables and Type Inference ---
+
+fn demo_variables():
+    let name = "HMAT"           # inferred: str
+    let version: int = 2        # explicit annotation
+    let mut counter = 0         # mutable
+    let pi = 3.14159            # inferred: float
+    let active = true           # inferred: bool
+
+    counter += 1
+    print(f"Language: {name} v{version}, counter: {counter}")
+
+# --- Functions and Return Values ---
+
+fn add(a: int, b: int) -> int:
+    a + b    # implicit return — last expression
+
+fn greet(name: str) -> str:
+    return f"Hello, {name}! Welcome to HMAT."
+
+fn divide(a: float, b: float) -> Result<float, str>:
+    if b == 0.0:
+        return Err("Division by zero")
+    return Ok(a / b)
+
+# --- Structs ---
+
+struct Point:
+    x: float
+    y: float
+
+    fn new(x: float, y: float) -> Point:
+        Point { x, y }
+
+    fn distance(self, other: &Point) -> float:
+        let dx = self.x - other.x
+        let dy = self.y - other.y
+        return (dx^2 + dy^2)  # sqrt when math is available
+
+    fn display(self) -> str:
+        return f"Point({self.x}, {self.y})"
+
+# --- Enums and Pattern Matching ---
+
+enum Shape:
+    Circle(float)
+    Rectangle(float, float)
+    Triangle { base: float, height: float }
+
+fn area(shape: Shape) -> float:
+    match shape:
+        Shape::Circle(r) -> 3.14159 * r^2
+        Shape::Rectangle(w, h) -> w * h
+        Shape::Triangle { base, height } -> 0.5 * base * height
+
+# --- Generics ---
+
+fn max<T: Comparable>(a: T, b: T) -> T:
+    if a > b: return a
+    return b
+
+fn first<T>(list: [T]) -> Option<T>:
+    if list.is_empty():
+        return None
+    return Some(list[0])
+
+# --- Closures and Iterators ---
+
+fn demo_closures():
+    let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    # Closures
+    let double = |x| x * 2
+    let is_even = |x| x % 2 == 0
+
+    # Iterator methods
+    let evens = nums.filter(is_even)
+    let doubled = evens.map(double)
+    let total = doubled.sum()
+
+    print(f"Sum of doubled evens: {total}")    # 60
+
+    # List comprehension (equivalent)
+    let comp_result = [x * 2 for x in nums if x % 2 == 0]
+    print(f"Same via comprehension: {comp_result}")
+
+# --- Error Handling ---
+
+fn demo_errors():
+    # Pattern matching on Result
+    match divide(10.0, 2.0):
+        Ok(result) -> print(f"10 / 2 = {result}")
+        Err(msg)   -> print(f"Error: {msg}")
+
+    match divide(10.0, 0.0):
+        Ok(result) -> print(f"Result: {result}")
+        Err(msg)   -> print(f"Error: {msg}")    # "Error: Division by zero"
+
+    # ? operator for propagation
+    fn compute(a: float, b: float) -> Result<float, str>:
+        let result = divide(a, b)?    # propagate error if Err
+        return Ok(result * 2.0)
+
+    match compute(10.0, 2.0):
+        Ok(v) -> print(f"Computed: {v}")     # 10.0
+        Err(e) -> print(f"Failed: {e}")
+
+    # Option
+    let nums = [1, 2, 3]
+    match first(nums):
+        Some(n) -> print(f"First: {n}")
+        None    -> print("Empty list")
+
+    let empty: [int] = []
+    let val = first(empty).unwrap_or(-1)
+    print(f"First of empty: {val}")    # -1
+
+# --- Pattern Matching ---
+
+fn demo_patterns():
+    # Literals
+    let score = 95
+    let grade = match score:
+        90..=100 -> "A"
+        80..=89  -> "B"
+        70..=79  -> "C"
+        _        -> "F"
+    print(f"Grade: {grade}")
+
+    # Enum variants
+    let shape = Shape::Rectangle(4.0, 5.0)
+    print(f"Area: {area(shape)}")    # 20.0
+
+    # Guards
+    let n = 42
+    match n:
+        x if x > 100 -> print("big")
+        x if x > 0   -> print("positive")    # this fires
+        _             -> print("non-positive")
+
+# --- Main ---
+
+fn main():
+    print("=== HMAT Core Language Demo ===")
+
+    demo_variables()
+
+    let greeting = greet("developer")
+    print(greeting)
+
+    let p1 = Point::new(0.0, 0.0)
+    let p2 = Point::new(3.0, 4.0)
+    print(p1.display())
+    print(p2.display())
+
+    print(f"max(3, 7) = {max(3, 7)}")
+    print(f"max(3.14, 2.71) = {max(3.14, 2.71)}")
+
+    demo_closures()
+    demo_errors()
+    demo_patterns()
+
+    print("=== Done ===")

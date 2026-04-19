@@ -1,0 +1,91 @@
+# ============================================================
+# HMAT Project .gitignore
+# Rule: Claude-related files, prompts, runner scripts = local only.
+# ============================================================
+
+# --- Claude brain and prompts (NEVER push) ---
+CLAUDE.md
+FIRST_PROMPT.md
+INSTRUCTIONS.md
+
+# --- Agent prompt files (NEVER push) ---
+agents/
+
+# --- Runner scripts (local workflow tooling, never push) ---
+Makefile
+run.py
+run.ps1
+
+# --- Local session/report scratch files ---
+clean/
+security/
+qa/
+docs/bugs/
+*.session.md
+
+# ============================================================
+# Rust build artifacts
+# ============================================================
+target/
+**/.cargo/
+
+# ============================================================
+# Test and coverage artifacts
+# ============================================================
+coverage/
+*.profraw
+*.profdata
+lcov.info
+tarpaulin-report.html
+fuzz/
+
+# ============================================================
+# Generated binaries and LLVM artifacts
+# ============================================================
+*.hm.out
+examples/*.bin
+/hello
+/output
+*.ll
+*.bc
+*.s
+*.o
+a.out
+
+# ============================================================
+# Editor and OS artifacts
+# ============================================================
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# Secrets — never commit
+# ============================================================
+.env
+.env.local
+.env.*
+!.env.example
+*.key
+*.pem
+*.secret
+
+# ============================================================
+# Tooling caches
+# ============================================================
+node_modules/
+dist/
+.hpkg/
+hpkg-lock.toml
+.hmat-cache/
+
+
+# ============================================================
+# Prompts
+# ============================================================
+prompts/

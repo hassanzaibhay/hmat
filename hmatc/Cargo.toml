@@ -1,0 +1,21 @@
+[package]
+name = "hmatc"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The HMAT programming language compiler"
+
+[[bin]]
+name = "hmatc"
+path = "src/main.rs"
+
+[lib]
+name = "hmatc"
+path = "src/lib.rs"
+
+[dependencies]
+logos = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
