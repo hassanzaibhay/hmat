@@ -5,11 +5,7 @@
 
 # --- Claude brain and prompts (NEVER push) ---
 CLAUDE.md
-FIRST_PROMPT.md
-INSTRUCTIONS.md
-
-# --- Agent prompt files (NEVER push) ---
-agents/
+prompts/
 
 # --- Runner scripts (local workflow tooling, never push) ---
 Makefile
@@ -22,6 +18,10 @@ security/
 qa/
 docs/bugs/
 *.session.md
+
+# --- Pipeline output files (local only) ---
+output
+output_*
 
 # ============================================================
 # Rust build artifacts
@@ -83,9 +83,3 @@ dist/
 .hpkg/
 hpkg-lock.toml
 .hmat-cache/
-
-
-# ============================================================
-# Prompts
-# ============================================================
-prompts/

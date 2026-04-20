@@ -1,28 +1,42 @@
-# HMAT Language Specification v0.2
+# HMAT Language Specification v0.3
 # Grammar — Lexical Rules and Syntax
 # Author: Hassan Zaib Hayat <hassanzaibhayatske@gmail.com>
 #
-# This is the authoritative grammar reference.
-# The compiler (hmatc) must implement exactly what is written here.
-# Any deviation is a compiler bug, not a language feature.
-#
-# Notation:
-#   ::=         definition
-#   |           alternation
-#   [ ]         optional (zero or one)
-#   { }         zero or more
-#   ( )         grouping
-#   ' '         literal terminal
-#   UPPER       lexer token (defined in Lexical section)
-#   lower       grammar rule (defined in Grammar section)
+# HMAT has its own unique identity.
+# It does not look like Python, Rust, C++, Java, Go, or any existing language.
+# The user provides only what the compiler has no way of inferring.
+# The compiler does maximum work.
 
 ---
 
-## 1. Source File
+## 1. What Makes HMAT Unique
 
-An HMAT source file is a UTF-8 encoded text file with the `.hm` extension.
-Line endings: LF (`\n`) or CRLF (`\r\n`) — normalized to LF.
-Encoding: UTF-8. Only ASCII identifiers in v0.2 (Unicode planned for v0.3).
+HMAT's identity comes from its overall feel and philosophy, not from removing
+every keyword. The language has its own character through its combination of:
+clean error handling, first-class AI/DS, expressive pattern matching, and a
+stdlib that covers what other languages need five packages to achieve.
+
+| Construct    | Common languages           | HMAT                  |
+|--------------|----------------------------|-----------------------|
+| Functions    | fn/def/func                | fn (kept, familiar)   |
+| Variables    | let/var/val                | let (kept, familiar)  |
+| Mutability   | Implicit or var            | mut — explicit        |
+| Structs      | struct/class               | shape                 |
+| Enums        | enum                       | type                  |
+| Pattern match| match/switch/when/case     | on                    |
+| Match arms   | -> or :                    | =>                    |
+| Fallible type| Result<T,E> / throws       | T or Fail             |
+| Optional type| Option<T> / T? / nullable  | T or nil              |
+| Raise error  | throw/raise/return Err     | fail                  |
+| Default value| unwrap_or / ?: / or_else   | or                    |
+| Generics     | <T>                        | [T]                   |
+| Closures     | |x| / lambda x / x ->     | x => expr             |
+| Pipelines    | (various)                  | flow                  |
+| Nil value    | null/None/nil              | nil                   |
+| AI model     | library import             | ai — first-class      |
+| Tensor       | import numpy               | tensor — first-class  |
+| DataFrame    | import pandas              | frame — first-class   |
+| Neural net   | import torch               | nn — first-class      |
 
 ---
 
@@ -31,118 +45,89 @@ Encoding: UTF-8. Only ASCII identifiers in v0.2 (Unicode planned for v0.3).
 ### 2.1 Whitespace and Comments
 
 ```
-WHITESPACE  ::= ' ' | '\t' | '\r'
-NEWLINE     ::= '\n'
-COMMENT     ::= '#' { any_char_except_newline }
+WHITESPACE ::= ' ' | '\t' | '\r'
+NEWLINE    ::= '\n'
+COMMENT    ::= '#' { any_char_except_newline }
 ```
 
-Whitespace (excluding newlines) is ignored between tokens.
-Newlines are **significant** — they terminate statements and drive indentation.
-Comments run from `#` to end of line. They are ignored by the parser.
+Newlines are significant. Comments stripped before parsing.
 
-### 2.2 Indentation
+### 2.2 Indentation (Significant Whitespace)
 
-HMAT uses **significant indentation** (Python-style) with **4-space** standard.
-Tabs are allowed but normalized to 4 spaces each (with a warning from `hfmt`).
-
-The lexer post-processes newlines into three logical tokens:
-- `NEWLINE` — end of statement
-- `INDENT` — indentation level increased (emitted once per increase)
-- `DEDENT` — indentation level decreased (emitted once per decrease, possibly multiple)
+4-space standard. Tabs normalized to 4 spaces.
+Lexer post-processes newlines into INDENT/DEDENT tokens:
 
 ```
-indent_rule:
-  After NEWLINE, count leading spaces on next non-empty line.
-  If count > current_indent: emit INDENT, push count to stack
-  If count == current_indent: no indent token
-  If count < current_indent: emit DEDENT for each level popped
-  Blank lines and comment-only lines do not affect indentation.
+After NEWLINE, count leading spaces on next non-empty/non-comment line:
+  count > current  → INDENT, push count
+  count == current → nothing
+  count < current  → DEDENT for each level popped
 ```
 
 ### 2.3 Keywords
 
-The following are reserved and cannot be used as identifiers:
-
 ```
-fn       let      mut      return   if       else     elif
-match    for      in       while    break    continue
-struct   enum     trait    impl     type     pub      self
-async    await    ai       model    load     pipeline
-unsafe   import   from     as       true     false    nil
-and      or       not      is       in
+fn       let      mut      async    await    return   if       else     elif
+on       for      in       while    break    continue
+shape    type     flow     ai       model    fail     or
+and      not      is       nil      true     false
+unsafe   import   from     as       pub      self
 ```
 
 ### 2.4 Identifiers
 
 ```
-IDENTIFIER  ::= (ALPHA | '_') { ALPHA | DIGIT | '_' }
-ALPHA       ::= 'a'..'z' | 'A'..'Z'
-DIGIT       ::= '0'..'9'
+IDENTIFIER ::= (ALPHA | '_') { ALPHA | DIGIT | '_' }
 ```
 
-Identifiers are case-sensitive.
-Convention (not enforced by compiler, enforced by hfmt):
-- Variables, functions, parameters: `snake_case`
-- Types, structs, enums, traits: `PascalCase`
-- Constants: `SCREAMING_SNAKE_CASE`
-- Modules: `snake_case`
+Conventions (formatter-enforced):
+- Variables, functions, params: snake_case
+- Shapes, Types: PascalCase
+- Constants: SCREAMING_SNAKE_CASE
 
 ### 2.5 Literals
 
 ```
-INT_LITERAL     ::= DIGIT { DIGIT | '_' }
-                  | '0x' HEX_DIGIT { HEX_DIGIT | '_' }
-                  | '0b' BIN_DIGIT { BIN_DIGIT | '_' }
-                  | '0o' OCT_DIGIT { OCT_DIGIT | '_' }
+INT_LITERAL   ::= DIGIT { DIGIT | '_' }
+                | '0x' HEX { HEX | '_' }
+                | '0b' BIN { BIN | '_' }
+                | '0o' OCT { OCT | '_' }
 
-FLOAT_LITERAL   ::= DIGIT { DIGIT } '.' { DIGIT }
-                    [ ('e' | 'E') ['+' | '-'] DIGIT { DIGIT } ]
+FLOAT_LITERAL ::= DIGIT { DIGIT } '.' { DIGIT }
+                  [ ('e'|'E') ['+'|'-'] DIGIT { DIGIT } ]
 
-STRING_LITERAL  ::= '"' { string_char } '"'
-string_char     ::= any_char_except('"', '\', '\n')
-                  | ESCAPE_SEQ
+STRING_LITERAL ::= '"' { string_char } '"'
+F_STRING       ::= 'f"' { string_char | '{' expression '}' } '"'
+BOOL_LITERAL   ::= 'true' | 'false'
+NIL_LITERAL    ::= 'nil'
 
-F_STRING        ::= 'f"' { fstring_part } '"'
-fstring_part    ::= string_char
-                  | '{' expression '}'
-
-ESCAPE_SEQ      ::= '\n' | '\t' | '\r' | '\\' | '\"' | '\0'
-                  | '\x' HEX_DIGIT HEX_DIGIT
-
-BOOL_LITERAL    ::= 'true' | 'false'
-NIL_LITERAL     ::= 'nil'
-
-HEX_DIGIT       ::= DIGIT | 'a'..'f' | 'A'..'F'
-BIN_DIGIT       ::= '0' | '1'
-OCT_DIGIT       ::= '0'..'7'
+ESCAPE_SEQ     ::= '\n' | '\t' | '\r' | '\\' | '\"' | '\0' | '\x' HH
 ```
 
-Numeric separators: `1_000_000` is valid, `_1000` is not.
+Numeric separators: `1_000_000` valid, `_1000` invalid.
 
 ### 2.6 Operators
 
 ```
-Arithmetic:   +   -   *   /   %   ^
-Comparison:   ==  !=  <   <=  >   >=
-Logical:      and or  not
-Bitwise:      &   |   ~   <<  >>
-Assignment:   =   +=  -=  *=  /=  %=
-Arrow:        ->  =>
-Borrow:       &   &mut
-Range:        ..  ..=
-Propagate:    ?
-Access:       .   ::
-Conditional:  if (ternary)
+Arithmetic:    +  -  *  /  %  ^
+Comparison:    == != <  <= >  >=
+Logical:       and  or  not
+Bitwise:       &  |  ~  <<  >>
+Assignment:    =  +=  -=  *=  /=  %=
+Return type:   ->
+Match / closure arm:  =>
+Range:         ..   ..=
+Member access: .
 ```
 
 ### 2.7 Delimiters
 
 ```
-(  )  — parentheses
-[  ]  — brackets
-{  }  — braces (used in f-strings only; blocks use indentation)
-:     — type annotation, block start
-,     — separator
+(  )   parentheses
+[  ]   brackets (collections AND generics)
+{  }   braces (f-strings and map/set literals only)
+:      type annotation, block start
+,      separator
 ```
 
 ---
@@ -152,252 +137,233 @@ Conditional:  if (ternary)
 ### 3.1 Top Level
 
 ```
-program         ::= { top_level_item }
-top_level_item  ::= function_decl
-                  | struct_decl
-                  | enum_decl
-                  | trait_decl
-                  | impl_block
-                  | type_alias
-                  | ai_model_decl
-                  | pipeline_decl
-                  | import_stmt
-                  | constant_decl
-                  | NEWLINE
+program        ::= { top_level_item }
+top_level_item ::= function_decl
+                 | shape_decl
+                 | type_decl
+                 | flow_decl
+                 | ai_decl
+                 | import_stmt
+                 | constant_decl
+                 | NEWLINE
 ```
 
-### 3.2 Import
+### 3.2 Imports
 
 ```
-import_stmt     ::= 'import' module_path NEWLINE
-                  | 'from' module_path 'import' import_list NEWLINE
-
-module_path     ::= IDENTIFIER { '::' IDENTIFIER }
-import_list     ::= import_item { ',' import_item }
-import_item     ::= IDENTIFIER [ 'as' IDENTIFIER ]
-                  | '*'
+import_stmt ::= 'import' module_path NEWLINE
+              | 'from' module_path 'import' import_list NEWLINE
+module_path ::= IDENTIFIER { '.' IDENTIFIER }
+import_list ::= IDENTIFIER ['as' IDENTIFIER] { ',' IDENTIFIER ['as' IDENTIFIER] }
 ```
 
-Examples:
 ```hmat
-import hmat::io
-from hmat::collections import Vec, HashMap
-from hmat::ai import Model as AiModel
+import hmat.io
+from hmat.collections import Map, Set
+from hmat.ai import ChatMessage as Msg
 ```
 
-### 3.3 Constants
+### 3.3 Constants (Top-Level Bindings)
 
 ```
-constant_decl   ::= 'let' IDENTIFIER ':' type '=' expression NEWLINE
+constant_decl ::= IDENTIFIER '=' expression NEWLINE
 ```
-(Top-level `let` without `mut` is a constant. Must be a compile-time expression.)
+
+Top-level bindings without `mut` are constants (must be compile-time expressions).
 
 ### 3.4 Functions
 
 ```
-function_decl   ::= [ 'pub' ] [ 'async' ] 'fn' IDENTIFIER
-                    [ generic_params ]
-                    '(' [ param_list ] ')'
-                    [ '->' type ]
-                    ':' NEWLINE
-                    INDENT
-                    { statement }
-                    DEDENT
+function_decl ::= [ 'pub' ] [ 'async' ] 'fn' IDENTIFIER
+                  [ generic_params ]
+                  '(' [ param_list ] ')'
+                  [ '->' return_type ]
+                  ':' NEWLINE
+                  INDENT { statement } DEDENT
 
-param_list      ::= param { ',' param }
-param           ::= [ 'mut' ] IDENTIFIER ':' type
-                  | 'self'
-                  | '&' 'self'
-                  | '&' 'mut' 'self'
+# Single-line shorthand
+function_decl ::= [ 'pub' ] [ 'async' ] 'fn' IDENTIFIER '(' [ param_list ] ')' ':' expression NEWLINE
 
-generic_params  ::= '<' generic_param { ',' generic_param } '>'
-generic_param   ::= IDENTIFIER [ ':' trait_bound ]
-trait_bound     ::= IDENTIFIER { '+' IDENTIFIER }
+param_list    ::= param { ',' param }
+param         ::= [ 'mut' ] IDENTIFIER [ ':' type ]
+                | 'self' | 'mut' 'self'
+
+generic_params ::= '[' generic_param { ',' generic_param } ']'
+generic_param  ::= IDENTIFIER [ ':' trait_bound ]
+trait_bound    ::= IDENTIFIER { '+' IDENTIFIER }
+
+return_type   ::= type
+                | type 'or' 'Fail'
+                | type 'or' 'nil'
+                | type 'or' 'Fail' 'or' 'nil'
 ```
 
 Examples:
 ```hmat
-fn greet(name: str) -> str:
-    return f"Hello, {name}!"
+# No types — fully inferred
+fn greet(name): "Hello, {name}!"
 
-pub async fn fetch(url: str) -> Result<str, HttpError>:
-    let response = await http.get(url)?
-    return response.text()
+# With types
+fn add(a: int, b: int) -> int: a + b
 
-fn max<T: Comparable>(a: T, b: T) -> T:
-    return a if a > b else b
+# Multi-line
+fn divide(a: float, b: float) -> float or Fail:
+    fail "zero" if b == 0.0
+    a / b
+
+# Generic
+fn max[T: Comparable](a: T, b: T) -> T:
+    a if a > b else b
+
+# Async fallible
+async fn fetch(url: str) -> str or Fail:
+    resp = await http.get(url)
+    resp.text()
 ```
 
-### 3.5 Structs
+### 3.5 Shape Declarations (Data Structures)
 
 ```
-struct_decl     ::= [ 'pub' ] 'struct' IDENTIFIER [ generic_params ] ':'
-                    NEWLINE INDENT
-                    { struct_field | function_decl | NEWLINE }
-                    DEDENT
+shape_decl  ::= [ 'pub' ] 'shape' IDENTIFIER [ generic_params ] ':'
+                NEWLINE INDENT
+                { shape_field | function_decl | NEWLINE }
+                DEDENT
 
-struct_field    ::= [ 'pub' ] IDENTIFIER ':' type NEWLINE
+shape_field ::= [ 'pub' ] IDENTIFIER ':' type NEWLINE
 ```
 
 Examples:
 ```hmat
-pub struct Point:
+shape Point:
     x: float
     y: float
 
     fn distance(self, other: Point) -> float:
-        return sqrt((self.x - other.x)^2 + (self.y - other.y)^2)
+        dx = self.x - other.x
+        dy = self.y - other.y
+        (dx^2 + dy^2).sqrt()
 
-pub struct Stack<T>:
-    data: Vec<T>
-    size: int
+shape Stack[T]:
+    data: [T]
+    mut size: int
 
-    pub fn push(mut self, value: T):
+    fn push(mut self, value: T):
         self.data.push(value)
         self.size += 1
 
-    pub fn pop(mut self) -> Option<T>:
-        return self.data.pop()
+    fn pop(mut self) -> T or nil:
+        self.data.pop()
 ```
 
-### 3.6 Enums
+### 3.6 Type Declarations (Sum Types)
 
 ```
-enum_decl       ::= [ 'pub' ] 'enum' IDENTIFIER [ generic_params ] ':'
-                    NEWLINE INDENT
-                    { enum_variant | NEWLINE }
-                    DEDENT
+type_decl   ::= [ 'pub' ] 'type' IDENTIFIER [ generic_params ]
+                '=' variant { '|' variant } NEWLINE       # inline
+              | [ 'pub' ] 'type' IDENTIFIER [ generic_params ] ':'
+                NEWLINE INDENT { type_variant NEWLINE } DEDENT  # block
 
-enum_variant    ::= IDENTIFIER [ enum_payload ] NEWLINE
-enum_payload    ::= '(' type_list ')'
-                  | '{' struct_field_list '}'
-
-type_list       ::= type { ',' type }
-struct_field_list ::= struct_field { struct_field }
-```
-
-Examples:
-```hmat
-pub enum Direction:
-    North
-    South
-    East
-    West
-
-pub enum Result<T, E>:
-    Ok(T)
-    Err(E)
-
-pub enum Shape:
-    Circle(float)
-    Rectangle(float, float)
-    Triangle { base: float, height: float }
-```
-
-### 3.7 Traits
-
-```
-trait_decl      ::= [ 'pub' ] 'trait' IDENTIFIER [ generic_params ] ':'
-                    NEWLINE INDENT
-                    { trait_method | NEWLINE }
-                    DEDENT
-
-trait_method    ::= function_signature NEWLINE
-                  | function_decl      # with default implementation
-
-function_signature ::= [ 'async' ] 'fn' IDENTIFIER [ generic_params ]
-                       '(' [ param_list ] ')' [ '->' type ]
+type_variant ::= IDENTIFIER [ '(' field_or_type_list ')' ]
+field_or_type_list ::= named_fields | type_list
+named_fields ::= IDENTIFIER ':' type { ',' IDENTIFIER ':' type }
+type_list    ::= type { ',' type }
 ```
 
 Examples:
 ```hmat
-pub trait Printable:
-    fn print(self)
+# Inline — simple
+type Direction = North | South | East | West
 
-pub trait Comparable:
-    fn compare(self, other: Self) -> int
-    fn equals(self, other: Self) -> bool:
-        return self.compare(other) == 0
+# Block — with payloads
+type Shape:
+    Circle(radius: float)
+    Rect(width: float, height: float)
+    Triangle(base: float, height: float)
 
-pub trait Serialize:
-    fn to_json(self) -> str
-    fn from_json(data: str) -> Result<Self, ParseError>
+# Generic
+type Tree[T]:
+    Leaf(T)
+    Node(left: Tree[T], right: Tree[T])
 ```
 
-### 3.8 Impl Blocks
+### 3.7 Pattern Matching — 'on'
 
 ```
-impl_block      ::= 'impl' [ generic_params ] [ IDENTIFIER 'for' ] IDENTIFIER ':'
-                    NEWLINE INDENT
-                    { function_decl | NEWLINE }
-                    DEDENT
-```
+on_stmt  ::= 'on' expression ':' NEWLINE INDENT { on_arm } DEDENT
 
-Examples:
-```hmat
-impl Point:
-    fn new(x: float, y: float) -> Point:
-        return Point { x: x, y: y }
+on_arm   ::= pattern '=>' ( expression | block ) NEWLINE
 
-impl Printable for Point:
-    fn print(self):
-        print(f"Point({self.x}, {self.y})")
-```
+pattern  ::= literal_pattern
+           | variant_pattern
+           | type_pattern
+           | nil_pattern
+           | wildcard_pattern
+           | guard_pattern
 
-### 3.9 Type Aliases
-
-```
-type_alias      ::= 'type' IDENTIFIER [ generic_params ] '=' type NEWLINE
-```
-
-Examples:
-```hmat
-type Callback = fn(str) -> bool
-type Matrix<T> = Vec<Vec<T>>
-type IoResult<T> = Result<T, IoError>
-```
-
-### 3.10 AI Model Declarations
-
-```
-ai_model_decl   ::= 'ai' 'model' IDENTIFIER '=' 'load' '(' STRING_LITERAL ')'
-                    [ ai_config_block ] NEWLINE
-
-ai_config_block ::= ':' NEWLINE INDENT { ai_config_field } DEDENT
-ai_config_field ::= IDENTIFIER ':' expression NEWLINE
+literal_pattern  ::= INT_LITERAL | FLOAT_LITERAL | STRING_LITERAL | BOOL_LITERAL
+variant_pattern  ::= IDENTIFIER [ '(' pattern_list ')' ]
+type_pattern     ::= type 'as' IDENTIFIER
+nil_pattern      ::= 'nil'
+wildcard_pattern ::= '_'
+guard_pattern    ::= pattern 'if' expression
+pattern_list     ::= pattern { ',' pattern }
 ```
 
 Examples:
 ```hmat
-ai model assistant = load("anthropic/claude-3-5-sonnet")
+# Literal
+on score:
+    100      => "perfect"
+    90..=99  => "excellent"
+    _        => "ok"
 
-ai model gpt = load("openai/gpt-4o"):
+# Type variants — no :: prefix, just the name
+on shape:
+    Circle(r)      => 3.14 * r^2
+    Rect(w, h)     => w * h
+    Triangle(b, h) => 0.5 * b * h
+
+# Error and nil handling
+on divide(10, 0):
+    float as n => print("got {n}")
+    Fail  as e => print("failed: {e}")
+
+# Guards
+on value:
+    n if n > 100 => "big"
+    n if n > 0   => "positive"
+    _            => "other"
+```
+
+### 3.8 AI Declarations
+
+```
+ai_decl ::= 'ai' IDENTIFIER '=' 'model' '(' STRING_LITERAL ')'
+            [ ':' NEWLINE INDENT { IDENTIFIER ':' expression NEWLINE } DEDENT ] NEWLINE
+```
+
+```hmat
+ai assistant = model("anthropic/claude-3-5-sonnet")
+
+ai gpt = model("openai/gpt-4o"):
     temperature: 0.7
     max_tokens: 2048
-    timeout: 30
 ```
 
-### 3.11 Pipeline Declarations
+### 3.9 Flow Declarations (Pipelines)
 
 ```
-pipeline_decl   ::= 'pipeline' IDENTIFIER ':'
-                    NEWLINE INDENT
-                    pipeline_body
-                    DEDENT
+flow_decl ::= 'flow' IDENTIFIER ':'
+              NEWLINE INDENT
+              flow_stage { '=>' flow_stage } NEWLINE
+              DEDENT
 
-pipeline_body   ::= pipeline_stage { '->' pipeline_stage } NEWLINE
-
-pipeline_stage  ::= IDENTIFIER
-                  | function_call
+flow_stage ::= IDENTIFIER | function_call
 ```
 
-Examples:
 ```hmat
-pipeline analyze_text:
-    input -> tokenize -> embed -> classify -> output
-
-pipeline process_image:
-    load_image(path) -> resize(224, 224) -> normalize -> model.infer -> output
+flow analyze:
+    input => clean => tokenize => embed => classify
 ```
 
 ---
@@ -405,132 +371,47 @@ pipeline process_image:
 ## 4. Statements
 
 ```
-statement       ::= let_stmt
-                  | assignment_stmt
-                  | return_stmt
-                  | if_stmt
-                  | match_stmt
-                  | for_stmt
-                  | while_stmt
-                  | break_stmt
-                  | continue_stmt
-                  | unsafe_block
-                  | expression_stmt
-                  | NEWLINE
+statement ::= binding_stmt
+            | mut_decl
+            | assignment_stmt
+            | return_stmt
+            | fail_stmt
+            | on_stmt
+            | if_stmt
+            | for_stmt
+            | while_stmt
+            | break_stmt
+            | continue_stmt
+            | unsafe_block
+            | expression_stmt
+            | NEWLINE
 
-expression_stmt ::= expression NEWLINE
-```
-
-### 4.1 Let Statement
-
-```
-let_stmt        ::= 'let' [ 'mut' ] IDENTIFIER [ ':' type ] '=' expression NEWLINE
-```
-
-Examples:
-```hmat
-let name = "HMAT"
-let mut counter: int = 0
-let point: Point = Point { x: 1.0, y: 2.0 }
-```
-
-### 4.2 Assignment
-
-```
-assignment_stmt ::= lvalue assign_op expression NEWLINE
-lvalue          ::= IDENTIFIER { '.' IDENTIFIER | '[' expression ']' }
-assign_op       ::= '=' | '+=' | '-=' | '*=' | '/=' | '%='
-```
-
-### 4.3 Return
-
-```
+binding_stmt    ::= IDENTIFIER '=' expression NEWLINE
+mut_decl        ::= 'mut' IDENTIFIER [ ':' type ] '=' expression NEWLINE
+assignment_stmt ::= lvalue compound_op expression NEWLINE
 return_stmt     ::= 'return' [ expression ] NEWLINE
+fail_stmt       ::= 'fail' expression [ 'if' expression ] NEWLINE
+expression_stmt ::= expression NEWLINE
+lvalue          ::= IDENTIFIER { '.' IDENTIFIER | '[' expression ']' }
+compound_op     ::= '+=' | '-=' | '*=' | '/=' | '%='
 ```
 
-Last expression in a block is implicitly returned (expression-oriented):
+### 4.1 If Statement
+
+```
+if_stmt ::= 'if' expression ':' NEWLINE INDENT { statement } DEDENT
+            { 'elif' expression ':' NEWLINE INDENT { statement } DEDENT }
+            [ 'else' ':' NEWLINE INDENT { statement } DEDENT ]
+```
+
+Inline ternary:
 ```hmat
-fn add(a: int, b: int) -> int:
-    a + b    # implicit return — no 'return' keyword needed
+label = "even" if x % 2 == 0 else "odd"
+fail "zero" if b == 0
 ```
 
-### 4.4 If Statement
+### 4.2 For / While
 
-```
-if_stmt         ::= 'if' expression ':' NEWLINE INDENT { statement } DEDENT
-                    { 'elif' expression ':' NEWLINE INDENT { statement } DEDENT }
-                    [ 'else' ':' NEWLINE INDENT { statement } DEDENT ]
-```
-
-Ternary (inline):
-```
-ternary_expr    ::= expression 'if' expression 'else' expression
-```
-
-Examples:
-```hmat
-if x > 0:
-    print("positive")
-elif x < 0:
-    print("negative")
-else:
-    print("zero")
-
-let label = "even" if x % 2 == 0 else "odd"
-```
-
-### 4.5 Match Statement
-
-```
-match_stmt      ::= 'match' expression ':' NEWLINE INDENT
-                    { match_arm }
-                    DEDENT
-
-match_arm       ::= pattern '->' ( expression | block ) NEWLINE
-
-pattern         ::= literal_pattern
-                  | identifier_pattern
-                  | enum_pattern
-                  | tuple_pattern
-                  | wildcard_pattern
-                  | guard_pattern
-
-literal_pattern     ::= INT_LITERAL | FLOAT_LITERAL | STRING_LITERAL | BOOL_LITERAL | NIL_LITERAL
-identifier_pattern  ::= IDENTIFIER
-enum_pattern        ::= IDENTIFIER '::' IDENTIFIER [ '(' pattern_list ')' ]
-tuple_pattern       ::= '(' pattern_list ')'
-wildcard_pattern    ::= '_'
-guard_pattern       ::= pattern 'if' expression
-pattern_list        ::= pattern { ',' pattern }
-```
-
-Examples:
-```hmat
-match status:
-    200 -> print("OK")
-    404 -> print("Not Found")
-    500 -> print("Server Error")
-    _   -> print("Unknown")
-
-match shape:
-    Shape::Circle(r) -> print(f"Circle with radius {r}")
-    Shape::Rectangle(w, h) -> print(f"{w} x {h}")
-    Shape::Triangle { base, height } -> print(f"Triangle {base} {height}")
-
-match value:
-    n if n > 100 -> print("big")
-    n if n > 0   -> print("positive")
-    _            -> print("non-positive")
-```
-
-### 4.6 For Loop
-
-```
-for_stmt        ::= 'for' IDENTIFIER 'in' expression ':' NEWLINE
-                    INDENT { statement } DEDENT
-```
-
-Examples:
 ```hmat
 for item in collection:
     print(item)
@@ -538,35 +419,17 @@ for item in collection:
 for i in 0..10:
     print(i)
 
-for i in 0..=10:    # inclusive range
-    print(i)
+while x > 0:
+    x -= 1
 ```
 
-### 4.7 While Loop
+### 4.3 Unsafe Block
 
-```
-while_stmt      ::= 'while' expression ':' NEWLINE INDENT { statement } DEDENT
-```
-
-### 4.8 Break and Continue
-
-```
-break_stmt      ::= 'break' NEWLINE
-continue_stmt   ::= 'continue' NEWLINE
-```
-
-### 4.9 Unsafe Block
-
-```
-unsafe_block    ::= 'unsafe' ':' NEWLINE INDENT { statement } DEDENT
-```
-
-Unsafe blocks must have a preceding comment explaining why they are safe:
 ```hmat
-# SAFETY: ptr is guaranteed non-null at this point (checked 3 lines above)
-# INVARIANT: alignment is always 8 bytes for this type
+# SAFETY: pointer guaranteed non-null (checked above)
+# INVARIANT: alignment is always 8 bytes
 unsafe:
-    let val = *ptr
+    val = raw_ptr(data)
 ```
 
 ---
@@ -574,144 +437,75 @@ unsafe:
 ## 5. Expressions
 
 ```
-expression      ::= ternary_expr
-
-ternary_expr    ::= logical_or_expr [ 'if' expression 'else' expression ]
-
-logical_or_expr ::= logical_and_expr { 'or' logical_and_expr }
-logical_and_expr::= equality_expr { 'and' equality_expr }
-equality_expr   ::= comparison_expr { ('==' | '!=') comparison_expr }
-comparison_expr ::= range_expr { ('<' | '<=' | '>' | '>=') range_expr }
-range_expr      ::= additive_expr [ ('..' | '..=') additive_expr ]
-additive_expr   ::= multiplicative_expr { ('+' | '-') multiplicative_expr }
-multiplicative_expr ::= unary_expr { ('*' | '/' | '%') unary_expr }
-unary_expr      ::= [ 'not' | '-' | '~' | '&' | '&mut' ] power_expr
-power_expr      ::= await_expr [ '^' unary_expr ]
-await_expr      ::= postfix_expr [ 'await' ]      # postfix await... OR
-                  | 'await' postfix_expr           # prefix await (both valid)
-postfix_expr    ::= primary_expr { postfix_op }
-postfix_op      ::= '.' IDENTIFIER
-                  | '.' function_call_args
-                  | '[' expression ']'
-                  | '?'
-                  | '(' [ arg_list ] ')'
-
-primary_expr    ::= IDENTIFIER
-                  | literal
-                  | f_string
-                  | struct_literal
-                  | tuple_expr
-                  | list_expr
-                  | map_expr
-                  | closure_expr
-                  | '(' expression ')'
-                  | function_call
+expression       ::= ternary_expr
+ternary_expr     ::= or_expr [ 'if' expression 'else' expression ]
+or_expr          ::= and_expr { 'or' and_expr }    # logical OR + fallback
+and_expr         ::= not_expr { 'and' not_expr }
+not_expr         ::= [ 'not' ] equality_expr
+equality_expr    ::= comparison_expr { ('=='|'!=') comparison_expr }
+comparison_expr  ::= range_expr { ('<'|'<='|'>'|'>=') range_expr }
+range_expr       ::= additive_expr [ ('..'|'..=') additive_expr ]
+additive_expr    ::= multiplicative_expr { ('+'|'-') multiplicative_expr }
+multiplicative_expr ::= unary_expr { ('*'|'/'|'%') unary_expr }
+unary_expr       ::= [ '-' | '~' ] power_expr
+power_expr       ::= await_expr [ '^' unary_expr ]
+await_expr       ::= 'await' postfix_expr | postfix_expr 'await'
+postfix_expr     ::= primary_expr { postfix_op }
+postfix_op       ::= '.' IDENTIFIER
+                   | '(' [ arg_list ] ')'
+                   | '[' expression ']'
+primary_expr     ::= IDENTIFIER | literal | f_string
+                   | shape_literal | list_expr | map_expr | set_expr
+                   | closure_expr | '(' expression ')'
 ```
 
-### 5.1 Literals
+### 5.1 The `or` Operator
 
-```
-literal         ::= INT_LITERAL
-                  | FLOAT_LITERAL
-                  | STRING_LITERAL
-                  | BOOL_LITERAL
-                  | NIL_LITERAL
-```
+Context-sensitive — compiler resolves:
 
-### 5.2 Struct Literal
-
-```
-struct_literal  ::= IDENTIFIER '{' [ field_init_list ] '}'
-field_init_list ::= field_init { ',' field_init }
-field_init      ::= IDENTIFIER ':' expression
-                  | IDENTIFIER    # shorthand: field name == variable name
-```
-
-Examples:
 ```hmat
-let p = Point { x: 1.0, y: 2.0 }
+# Fallback (Fail or nil context)
+result = divide(10, 0) or 0.0
+name   = get_user()    or "anonymous"
+val    = first([])     or -1
 
-let x = 1.0
-let y = 2.0
-let p = Point { x, y }   # shorthand
+# Logical (boolean context)
+ok = is_admin or is_owner
+```
+
+### 5.2 Shape Literals
+
+```hmat
+p = Point { x: 1.0, y: 2.0 }
+p = Point { x, y }    # shorthand — variable names match fields
 ```
 
 ### 5.3 Collections
 
-```
-list_expr       ::= '[' [ expression_list ] ']'
-                  | '[' expression 'for' IDENTIFIER 'in' expression [ 'if' expression ] ']'
-
-map_expr        ::= '{' [ map_entry_list ] '}'
-map_entry_list  ::= map_entry { ',' map_entry }
-map_entry       ::= expression ':' expression
-
-tuple_expr      ::= '(' expression ',' { expression ',' } ')'
-
-expression_list ::= expression { ',' expression }
-```
-
-Examples:
 ```hmat
-let nums = [1, 2, 3, 4, 5]
-let squares = [x^2 for x in 1..=5]
-let evens = [x for x in nums if x % 2 == 0]
-
-let scores = { "alice": 100, "bob": 95 }
-let pair = (1, "hello")
+nums  = [1, 2, 3, 4, 5]
+range = [1..10]
+evens = [x for x in nums if x % 2 == 0]
+scores = { "alice": 100, "bob": 95 }
+primes = {2, 3, 5, 7}
 ```
 
 ### 5.4 Closures
 
-```
-closure_expr    ::= '|' [ param_list ] '|' '->' type ':' expression
-                  | '|' [ param_list ] '|' expression
-                  | '||' expression
-```
-
-Examples:
 ```hmat
-let double = |x| x * 2
-let add = |a, b| a + b
-let greet = |name: str| -> str: f"Hello, {name}!"
-let no_args = || 42
+double   = x => x * 2
+add      = (a, b) => a + b
+no_args  = () => 42
 ```
 
-### 5.5 Function Calls
-
-```
-function_call   ::= IDENTIFIER [ '::' IDENTIFIER ] [ generic_args ] '(' [ arg_list ] ')'
-arg_list        ::= arg { ',' arg }
-arg             ::= [ IDENTIFIER ':' ] expression    # named or positional
-generic_args    ::= '<' type_list '>'
-```
-
-Examples:
-```hmat
-print("hello")
-Vec::new()
-max::<int>(a, b)
-sort(list, key: |x| x.age)
-```
-
-### 5.6 Await Expression
+### 5.5 AI Method Calls
 
 ```hmat
-# Both are valid — compiler normalizes them
-let result = await some_async_fn()
-let result = some_async_fn().await    # postfix style
-```
-
-### 5.7 Error Propagation Operator
-
-```
-?    # on a Result<T,E> or Option<T>: unwraps Ok/Some or early-returns Err/None
-```
-
-```hmat
-fn read_file(path: str) -> Result<str, IoError>:
-    let content = fs.read(path)?    # returns Err if read fails
-    return Ok(content)
+reply   = assistant.ask("What is HMAT?")
+summary = assistant.think(document)
+code    = assistant.gen("binary search")
+label   = assistant.classify(text, labels: ["pos", "neg"])
+vec     = assistant.embed("hello world")
 ```
 
 ---
@@ -719,150 +513,113 @@ fn read_file(path: str) -> Result<str, IoError>:
 ## 6. Types
 
 ```
-type            ::= primitive_type
-                  | named_type
-                  | generic_type
-                  | function_type
-                  | reference_type
-                  | optional_type
-                  | result_type
-                  | tuple_type
-                  | array_type
-                  | ai_type
+type          ::= primitive_type | named_type | generic_type
+                | list_type | map_type | set_type | tuple_type
+                | function_type | fallible_type | nilable_type
+                | ai_type
 
-primitive_type  ::= 'int' | 'i8' | 'i16' | 'i32' | 'i64' | 'i128'
-                  | 'uint' | 'u8' | 'u16' | 'u32' | 'u64' | 'u128'
-                  | 'float' | 'f32' | 'f64'
-                  | 'bool'
-                  | 'str'
-                  | 'char'
-                  | 'byte'
-                  | '()'          # unit type (void equivalent)
+primitive_type ::= 'int'|'i8'|'i16'|'i32'|'i64'|'i128'
+                 | 'uint'|'u8'|'u16'|'u32'|'u64'|'u128'
+                 | 'float'|'f32'|'f64'
+                 | 'bool'|'str'|'char'|'byte'|'()'
 
-named_type      ::= IDENTIFIER
-generic_type    ::= IDENTIFIER '<' type_list '>'
-function_type   ::= 'fn' '(' [ type_list ] ')' [ '->' type ]
-reference_type  ::= '&' type | '&mut' type
-optional_type   ::= 'Option' '<' type '>'
-result_type     ::= 'Result' '<' type ',' type '>'
-tuple_type      ::= '(' type ',' { type ',' } ')'
-array_type      ::= '[' type ']'         # dynamic array (Vec equivalent)
-                  | '[' type ';' INT_LITERAL ']'  # fixed-size array
-
-ai_type         ::= 'Model'              # AI model handle
-                  | 'Prompt'             # typed prompt string
-                  | 'HmatCode'           # generated HMAT code (safe eval)
+generic_type  ::= IDENTIFIER '[' type_list ']'   # [T] not <T>
+list_type     ::= '[' type ']'
+map_type      ::= '{' type ':' type '}'
+set_type      ::= '{' type '}'
+fallible_type ::= type 'or' 'Fail'
+nilable_type  ::= type 'or' 'nil'
+ai_type       ::= 'Model' | 'Flow' | 'GenCode'
 ```
 
-### Default Integer/Float Types
-
-- `int` → `i64` on 64-bit platforms
-- `uint` → `u64` on 64-bit platforms
-- `float` → `f64`
+Defaults: `int` = i64, `float` = f64.
 
 ---
 
 ## 7. Operator Precedence (High to Low)
 
-| Level | Operators              | Associativity |
-|-------|------------------------|---------------|
-| 1     | `()` `[]` `.` `?`     | Left          |
-| 2     | `^` (power)           | Right         |
-| 3     | `not` `-` `~` `&` `&mut` | Prefix     |
-| 4     | `*` `/` `%`           | Left          |
-| 5     | `+` `-`               | Left          |
-| 6     | `..` `..=`            | Non-assoc     |
-| 7     | `<` `<=` `>` `>=`    | Non-assoc     |
-| 8     | `==` `!=`             | Left          |
-| 9     | `&` (bitwise)         | Left          |
-| 10    | `|` (bitwise)         | Left          |
-| 11    | `and`                 | Left          |
-| 12    | `or`                  | Left          |
-| 13    | `if` `else` (ternary) | Right         |
-| 14    | `=` `+=` `-=` etc.   | Right         |
+| Level | Operators                   | Assoc   |
+|-------|-----------------------------|---------|
+| 1     | `()` `[]` `.`               | Left    |
+| 2     | `^`                         | Right   |
+| 3     | `-` `~` (unary)             | Prefix  |
+| 4     | `*` `/` `%`                 | Left    |
+| 5     | `+` `-`                     | Left    |
+| 6     | `..` `..=`                  | Non     |
+| 7     | `<` `<=` `>` `>=`           | Non     |
+| 8     | `==` `!=`                   | Left    |
+| 9     | `&`                         | Left    |
+| 10    | `\|`                        | Left    |
+| 11    | `and`                       | Left    |
+| 12    | `or`                        | Left    |
+| 13    | ternary (`if`/`else`)       | Right   |
+| 14    | `=` `+=` etc.               | Right   |
 
 ---
 
-## 8. Error Handling
+## 8. Error Model
 
-HMAT has no exceptions. Errors are values.
+No exceptions. No Result<T,E>. Errors are values that propagate automatically.
 
 ```hmat
-# Result<T, E> — operation that can fail
-fn parse_int(s: str) -> Result<int, ParseError>:
-    ...
+# Declare that a function can fail
+divide(a: float, b: float) -> float or Fail:
+    fail "zero" if b == 0.0
+    a / b
 
-# Option<T> — value that may be absent
-fn find(list: [int], target: int) -> Option<int>:
-    ...
+# Errors propagate automatically — no ? needed
+process(input: str) -> float or Fail:
+    n = parse_float(input)     # auto-propagates if fails
+    divide(n, 2.0)             # auto-propagates if fails
 
-# ? operator — propagate errors
-fn process(input: str) -> Result<Output, Error>:
-    let parsed = parse_int(input)?      # early return if Err
-    let found = find_in_db(parsed)?     # early return if Err
-    return Ok(transform(found))
+# Handle with 'or' (default)
+result = divide(10, 0) or 0.0
 
-# Pattern matching on results
-match divide(10.0, 0.0):
-    Ok(result) -> print(f"Result: {result}")
-    Err(e)     -> print(f"Error: {e}")
-
-# Chaining
-let result = parse_int(s)
-    .map(|n| n * 2)
-    .and_then(|n| validate(n))
-    .unwrap_or(0)
+# Handle with 'on' (explicit)
+on divide(10, 0):
+    float as n => use(n)
+    Fail  as e => log(e)
 ```
 
 ---
 
 ## 9. Compiler Error Format
 
-Every diagnostic must follow this exact format:
-
 ```
-error[EXXXX]: <human readable message>
-  --> <file>:<line>:<column>
+error[EXXXX]: <message>
+  --> file.hm:line:col
    |
-<line_num> | <source line>
-   |         <^^^^^^^^^^^^> <what this points to>
+N  | source line
+   | ^^^^^^^^^^^ what this is
    |
-   = help: <actionable suggestion>
-   = note: <optional additional context>
+   = help: what to do
+   = note: optional context
 ```
 
-Error code ranges:
-- `E001–E099`: Syntax errors (parser)
-- `E100–E199`: Type errors (type checker)
-- `E200–E299`: Ownership errors (borrow checker)
-- `E300–E399`: AI construct errors (ai validator)
-- `E400–E499`: Import/module errors
-- `E500–E599`: Codegen errors (internal — user should never see these)
-- `W001–W099`: Warnings (unused variables, deprecated features)
+Ranges: E001-E099 syntax, E100-E199 types, E200-E299 ownership,
+        E300-E399 AI, E400-E499 modules, W001-W099 warnings.
 
 ---
 
-## 10. Grammar Summary (Quick Reference)
+## 10. Design Decision Log
 
-```
-program         = { top_level_item }
-top_level_item  = fn_decl | struct_decl | enum_decl | trait_decl
-                | impl_block | type_alias | ai_model_decl
-                | pipeline_decl | import_stmt | constant_decl
-
-fn_decl         = ['pub'] ['async'] 'fn' IDENT [generics] '(' [params] ')' ['-> type'] ':' block
-struct_decl     = ['pub'] 'struct' IDENT [generics] ':' INDENT {field | fn_decl} DEDENT
-enum_decl       = ['pub'] 'enum' IDENT [generics] ':' INDENT {variant} DEDENT
-trait_decl      = ['pub'] 'trait' IDENT [generics] ':' INDENT {fn_sig | fn_decl} DEDENT
-impl_block      = 'impl' [generics] [IDENT 'for'] IDENT ':' INDENT {fn_decl} DEDENT
-
-statement       = let_stmt | assign_stmt | return_stmt | if_stmt | match_stmt
-                | for_stmt | while_stmt | break_stmt | continue_stmt
-                | unsafe_block | expr_stmt
-
-expression      = ternary | logical | comparison | range | arithmetic
-                | unary | power | await_expr | postfix | primary
-
-type            = primitive | named | generic | fn_type | &type | &mut type
-                | Option<T> | Result<T,E> | [T] | [T;N] | (T, ...)
-```
+| ID  | Decision                  | Choice          | Rationale                                      |
+|-----|---------------------------|-----------------|------------------------------------------------|
+| D001| Function keyword          | fn              | Familiar, readable, no reason to remove        |
+| D002| Variable keyword          | let (optional)  | let is clean; bare assignment also works       |
+| D003| Struct keyword            | shape           | Unique, describes data shape, not borrowed     |
+| D004| Enum keyword              | type            | Sum types, not enumeration — more accurate     |
+| D005| Pattern match keyword     | on              | Short, unique, reads naturally                 |
+| D006| Match arm separator       | =>              | Distinct from return type ->                   |
+| D007| Fallible return type      | T or Fail       | English-readable, no type wrapping noise       |
+| D008| Optional return type      | T or nil        | English-readable, no Option<T> noise           |
+| D009| Error fallback            | or              | Universal, reads as natural English            |
+| D010| Raise error               | fail            | Short, unique, clear intent                    |
+| D011| Generic brackets          | [T] not <T>     | No confusion with comparison operators         |
+| D012| Closure style             | x => expr       | Universal arrow, known from math               |
+| D013| Pipeline keyword          | flow            | Unique, data flows through stages              |
+| D014| Nil value                 | nil             | Short, unique to HMAT                          |
+| D015| Error propagation         | Automatic       | No ? operator — compiler handles it            |
+| D016| Borrows                   | Invisible       | Compiler tracks — user never writes &          |
+| D017| Significant indentation   | Yes             | Enforces readability                           |
+| D018| No semicolons             | Yes             | Newlines are sufficient                        |

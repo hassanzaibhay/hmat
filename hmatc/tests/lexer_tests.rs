@@ -129,18 +129,24 @@ fn identifiers_allow_underscores_and_digits() {
 
 #[test]
 fn decimal_integer_literals() {
-    assert_eq!(toks("0 1 42 1000"), vec![
-        Token::IntLiteral(0),
-        Token::IntLiteral(1),
-        Token::IntLiteral(42),
-        Token::IntLiteral(1000),
-        Token::Newline,
-    ]);
+    assert_eq!(
+        toks("0 1 42 1000"),
+        vec![
+            Token::IntLiteral(0),
+            Token::IntLiteral(1),
+            Token::IntLiteral(42),
+            Token::IntLiteral(1000),
+            Token::Newline,
+        ]
+    );
 }
 
 #[test]
 fn integer_literals_with_underscores() {
-    assert_eq!(toks("1_000_000"), vec![Token::IntLiteral(1_000_000), Token::Newline]);
+    assert_eq!(
+        toks("1_000_000"),
+        vec![Token::IntLiteral(1_000_000), Token::Newline]
+    );
 }
 
 #[test]
@@ -160,6 +166,7 @@ fn hex_binary_octal_integer_literals() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)] // 3.14 here is a literal under test, not an approximation of π.
 fn float_literals() {
     let t = toks("3.14 0.0 1_000.5");
     assert_eq!(t.len(), 4);
@@ -564,4 +571,455 @@ fn error_propagation_operator_tokenizes() {
     let src = "let x = foo()?";
     let t = toks(src);
     assert!(t.contains(&Token::Question));
+}
+
+// ======================================================================
+// Escape sequences — exhaustive coverage
+// ======================================================================
+
+#[test]
+fn all_standard_escapes_in_solo_strings() {
+    // Each standard escape, alone in a string, decodes to the right char.
+    let cases: &[(&str, &str)] = &[
+        (r#""\n""#, "\n"),
+        (r#""\t""#, "\t"),
+        (r#""\r""#, "\r"),
+        (r#""\\""#, "\\"),
+        (r#""\"""#, "\""),
+        (r#""\"""#, "\""),
+        (r#""\0""#, "\0"),
+    ];
+    for (src, expected) in cases {
+        let t = toks(src);
+        if let Token::StringLiteral(s) = &t[0] {
+            assert_eq!(s.as_str(), *expected, "escape in solo string, input: {src}");
+        } else {
+            panic!("expected StringLiteral, got {:?} for input {src}", t[0]);
+        }
+    }
+}
+
+#[test]
+fn escape_at_start_of_string() {
+    let t = toks(r#""\nhello""#);
+    if let Token::StringLiteral(s) = &t[0] {
+        assert_eq!(s, "\nhello");
+    } else {
+        panic!("expected StringLiteral");
+    }
+}
+
+#[test]
+fn escape_at_end_of_string() {
+    let t = toks(r#""hello\n""#);
+    if let Token::StringLiteral(s) = &t[0] {
+        assert_eq!(s, "hello\n");
+    } else {
+        panic!("expected StringLiteral");
+    }
+}
+
+#[test]
+fn escape_in_middle_of_string() {
+    let t = toks(r#""hel\nlo""#);
+    if let Token::StringLiteral(s) = &t[0] {
+        assert_eq!(s, "hel\nlo");
+    } else {
+        panic!("expected StringLiteral");
+    }
+}
+
+#[test]
+fn adjacent_escapes_all_decoded() {
+    let t = toks(r#""\n\t\r\\\"\0""#);
+    if let Token::StringLiteral(s) = &t[0] {
+        assert_eq!(s, "\n\t\r\\\"\0");
+    } else {
+        panic!("expected StringLiteral");
+    }
+}
+
+#[test]
+fn hex_escape_at_start_of_string() {
+    let t = toks(r#""\x41BC""#);
+    if let Token::StringLiteral(s) = &t[0] {
+        assert_eq!(s, "ABC");
+    } else {
+        panic!("expected StringLiteral");
+    }
+}
+
+#[test]
+fn hex_escape_at_end_of_string() {
+    let t = toks(r#""AB\x43""#);
+    if let Token::StringLiteral(s) = &t[0] {
+        assert_eq!(s, "ABC");
+    } else {
+        panic!("expected StringLiteral");
+    }
+}
+
+#[test]
+fn adjacent_hex_escapes() {
+    // \x41\x42\x43 == "ABC"
+    let t = toks(r#""\x41\x42\x43""#);
+    if let Token::StringLiteral(s) = &t[0] {
+        assert_eq!(s, "ABC");
+    } else {
+        panic!("expected StringLiteral");
+    }
+}
+
+#[test]
+fn hex_escape_lowercase_digits() {
+    // \x61 == 'a'
+    let t = toks(r#""\x61""#);
+    if let Token::StringLiteral(s) = &t[0] {
+        assert_eq!(s, "a");
+    } else {
+        panic!("expected StringLiteral");
+    }
+}
+
+// ======================================================================
+// Malformed escape sequences and literals
+// ======================================================================
+
+#[test]
+fn invalid_escape_z_produces_malformed_literal() {
+    let err = tokenize(r#""\z""#).expect_err("\\z is not a valid escape");
+    assert!(matches!(err, LexError::MalformedLiteral { .. }));
+    assert_eq!(err.code(), "E002");
+}
+
+#[test]
+fn incomplete_hex_escape_no_digits_produces_malformed_literal() {
+    // \x with no hex digits following — string ends immediately after \x
+    let err = tokenize(r#""\x""#).expect_err("\\x with no digits is malformed");
+    assert!(matches!(err, LexError::MalformedLiteral { .. }));
+    assert_eq!(err.code(), "E002");
+}
+
+#[test]
+fn incomplete_hex_escape_one_digit_produces_malformed_literal() {
+    // \x4 — only one hex digit, second is end-of-string
+    let err = tokenize(r#""\x4""#).expect_err("\\x4 with only one digit is malformed");
+    assert!(matches!(err, LexError::MalformedLiteral { .. }));
+    assert_eq!(err.code(), "E002");
+}
+
+#[test]
+fn hex_escape_with_non_hex_chars_produces_malformed_literal() {
+    // \xZZ — Z is not a valid hex digit
+    let err = tokenize(r#""\xZZ""#).expect_err("\\xZZ has invalid hex chars");
+    assert!(matches!(err, LexError::MalformedLiteral { .. }));
+    assert_eq!(err.code(), "E002");
+}
+
+#[test]
+fn malformed_escape_error_has_help_text() {
+    let err = tokenize(r#""\z""#).expect_err("should fail");
+    let help = err.help();
+    assert!(!help.is_empty(), "error must always include a help message");
+    assert!(
+        help.contains("\\xHH"),
+        "help should mention valid escapes, got: {help}"
+    );
+}
+
+// ======================================================================
+// Integer overflow
+// ======================================================================
+
+#[test]
+fn integer_overflow_produces_malformed_literal() {
+    // 23 nines — far exceeds i64::MAX (~9.2e18)
+    let err = tokenize("99999999999999999999999").expect_err("overflow should error");
+    assert!(
+        matches!(
+            err,
+            LexError::MalformedLiteral {
+                kind: "integer",
+                ..
+            }
+        ),
+        "expected MalformedLiteral(integer), got: {err:?}"
+    );
+    assert_eq!(err.code(), "E002");
+}
+
+#[test]
+fn integer_overflow_error_has_help_text() {
+    let err = tokenize("99999999999999999999999").expect_err("should fail");
+    let help = err.help();
+    assert!(
+        help.contains("64-bit") || help.contains("overflow"),
+        "help should mention 64-bit overflow, got: {help}"
+    );
+}
+
+// ======================================================================
+// Unicode / non-ASCII identifiers
+// ======================================================================
+
+#[test]
+fn non_ascii_char_lambda_produces_invalid_token() {
+    // Spec §2.4: identifiers are ASCII only in v0.2
+    let err = tokenize("λ").expect_err("λ is not valid ASCII");
+    assert!(matches!(err, LexError::InvalidToken { .. }));
+    assert_eq!(err.code(), "E001");
+}
+
+#[test]
+fn ascii_prefix_then_non_ascii_produces_invalid_token() {
+    // "caf" lexes as identifier, then "é" is an unknown character
+    let err = tokenize("café").expect_err("é is not valid HMAT");
+    assert!(matches!(err, LexError::InvalidToken { .. }));
+    assert_eq!(err.code(), "E001");
+}
+
+#[test]
+fn non_ascii_identifier_does_not_panic() {
+    // Ensures the lexer fails gracefully (no panic, no stack overflow)
+    for s in ["α", "中", "🚀", "ñ", "ü", "ß"] {
+        let result = tokenize(s);
+        assert!(result.is_err(), "non-ASCII `{s}` must fail, not succeed");
+        assert!(!matches!(
+            result.unwrap_err(),
+            LexError::IndentMismatch { .. }
+        ));
+    }
+}
+
+// ======================================================================
+// Indentation edge cases
+// ======================================================================
+
+#[test]
+fn mixed_tab_space_indent_uses_four_column_tab() {
+    // \t + 2 spaces = 4 + 2 = 6 columns — lexer accepts it (hfmt normalises)
+    let src = "fn main():\n\t  let x = 1\n";
+    let t = toks(src);
+    assert!(
+        t.contains(&Token::Indent),
+        "6-column indent should open a block"
+    );
+    assert!(t.contains(&Token::Dedent), "block must be closed");
+}
+
+#[test]
+fn tab_only_indent_matches_four_space_indent() {
+    // Single tab == 4 spaces for indent purposes
+    let tab_src = "fn main():\n\tlet x = 1\n";
+    let space_src = "fn main():\n    let x = 1\n";
+    assert_eq!(
+        toks(tab_src),
+        toks(space_src),
+        "tab indent must tokenize identically to 4-space indent"
+    );
+}
+
+#[test]
+fn deeply_nested_indentation_20_levels_no_panic() {
+    // 20 nested if-blocks — no stack overflow, balanced indent/dedent
+    let mut src = String::new();
+    for depth in 0..20 {
+        src.push_str(&format!("{}if x:\n", "    ".repeat(depth)));
+    }
+    src.push_str(&format!("{}let v = 1\n", "    ".repeat(20)));
+
+    let t = toks(&src);
+    let indent_count = t.iter().filter(|x| matches!(x, Token::Indent)).count();
+    let dedent_count = t.iter().filter(|x| matches!(x, Token::Dedent)).count();
+    assert_eq!(indent_count, 20, "should open 20 indent levels");
+    assert_eq!(dedent_count, 20, "every indent must be closed");
+}
+
+#[test]
+fn windows_crlf_line_endings_tokenize_correctly() {
+    let crlf = "fn main():\r\n    let x = 1\r\n";
+    let lf = "fn main():\n    let x = 1\n";
+    assert_eq!(
+        toks(crlf),
+        toks(lf),
+        "\\r\\n should produce the same tokens as \\n"
+    );
+}
+
+#[test]
+fn crlf_only_source_produces_no_tokens() {
+    assert!(toks("\r\n\r\n").is_empty());
+}
+
+#[test]
+fn mismatched_dedent_in_second_block() {
+    // Two functions; the second has a bad dedent within its body
+    let src = "\
+fn a():
+    let x = 1
+fn b():
+    if y:
+        let z = 2
+      let w = 3
+";
+    let err = tokenize(src).expect_err("bad dedent inside b() must error");
+    assert!(matches!(err, LexError::IndentMismatch { .. }));
+    assert_eq!(err.code(), "E003");
+}
+
+#[test]
+fn mismatched_dedent_error_has_help_text() {
+    let src = "fn main():\n    if x:\n        let y = 1\n      let z = 2\n";
+    let err = tokenize(src).expect_err("should fail");
+    let help = err.help();
+    assert!(
+        help.contains("4 spaces") || help.contains("indent"),
+        "help should guide the user, got: {help}"
+    );
+}
+
+// ======================================================================
+// Spec gap decisions
+// ======================================================================
+
+// Decision: `<<` / `>>` are NOT tokenized as single tokens in v0.2.
+// They emit two `<`/`>` tokens so `Vec<Vec<int>>` can close cleanly.
+// The parser combines them in arithmetic contexts if needed.
+// This test documents and locks in that decision.
+#[test]
+fn shift_operators_emit_two_lt_gt_tokens() {
+    let t = toks("a << b");
+    assert_eq!(
+        t,
+        vec![
+            Token::Identifier("a".into()),
+            Token::Lt,
+            Token::Lt,
+            Token::Identifier("b".into()),
+            Token::Newline,
+        ],
+        "<<  must lex as two Lt tokens in v0.2"
+    );
+
+    let t2 = toks("a >> b");
+    assert_eq!(
+        t2,
+        vec![
+            Token::Identifier("a".into()),
+            Token::Gt,
+            Token::Gt,
+            Token::Identifier("b".into()),
+            Token::Newline,
+        ],
+        ">> must lex as two Gt tokens in v0.2"
+    );
+}
+
+// Decision: `3.` is NOT a float literal — trailing dot tokenizes as Dot.
+// This is an intentional narrowing of the spec grammar so that `3.max()`
+// can be parsed as a method call (IntLiteral → Dot → Identifier).
+// Already tested in `trailing_dot_is_int_then_dot_not_float`; this test
+// adds the full method-call form and documents the decision explicitly.
+#[test]
+fn trailing_dot_method_call_tokenizes_as_int_dot_identifier_call() {
+    let t = toks("3.max()");
+    assert_eq!(
+        t,
+        vec![
+            Token::IntLiteral(3),
+            Token::Dot,
+            Token::Identifier("max".into()),
+            Token::LParen,
+            Token::RParen,
+            Token::Newline,
+        ],
+        "3.max() must not treat `3.` as a float — intentional spec narrowing"
+    );
+}
+
+// `elif` is a reserved keyword; test a full if/elif/else keyword chain.
+// Parser tests will verify AST structure once the parser is implemented.
+#[test]
+fn if_elif_else_keywords_tokenize_in_chain() {
+    let src = "if x:\n    a\nelif y:\n    b\nelse:\n    c\n";
+    let t = toks(src);
+    assert!(t.contains(&Token::If));
+    assert!(t.contains(&Token::Elif));
+    assert!(t.contains(&Token::Else));
+    // The keywords must appear in order
+    let kw_positions: Vec<_> = t
+        .iter()
+        .enumerate()
+        .filter(|(_, tok)| matches!(tok, Token::If | Token::Elif | Token::Else))
+        .map(|(i, _)| i)
+        .collect();
+    assert_eq!(kw_positions.len(), 3, "must find if, elif, else");
+    assert!(
+        kw_positions[0] < kw_positions[1] && kw_positions[1] < kw_positions[2],
+        "if must precede elif which must precede else"
+    );
+}
+
+// ======================================================================
+// Example files — end-to-end tokenization
+// ======================================================================
+
+#[test]
+fn core_language_example_tokenizes_without_errors() {
+    let src = include_str!("../../examples/core_language.hm");
+    let result = tokenize(src);
+    assert!(
+        result.is_ok(),
+        "core_language.hm must lex cleanly, got: {:?}",
+        result.unwrap_err()
+    );
+    let tokens = result.unwrap();
+    // Spot-check: must contain fn, struct, enum, match keywords
+    let has = |tok: &Token| tokens.iter().any(|(t, _)| t == tok);
+    assert!(has(&Token::Fn), "must contain `fn`");
+    assert!(has(&Token::Struct), "must contain `struct`");
+    assert!(has(&Token::Enum), "must contain `enum`");
+    assert!(has(&Token::Match), "must contain `match`");
+    // Balanced indent/dedent
+    let indents = tokens
+        .iter()
+        .filter(|(t, _)| matches!(t, Token::Indent))
+        .count();
+    let dedents = tokens
+        .iter()
+        .filter(|(t, _)| matches!(t, Token::Dedent))
+        .count();
+    assert_eq!(
+        indents, dedents,
+        "core_language.hm indent/dedent must balance"
+    );
+}
+
+#[test]
+fn ai_chat_example_tokenizes_without_errors() {
+    let src = include_str!("../../examples/ai_chat.hm");
+    let result = tokenize(src);
+    assert!(
+        result.is_ok(),
+        "ai_chat.hm must lex cleanly, got: {:?}",
+        result.unwrap_err()
+    );
+    let tokens = result.unwrap();
+    // Spot-check: must contain ai, model, load, async, await keywords
+    let has = |tok: &Token| tokens.iter().any(|(t, _)| t == tok);
+    assert!(has(&Token::Ai), "must contain `ai`");
+    assert!(has(&Token::Model), "must contain `model`");
+    assert!(has(&Token::Load), "must contain `load`");
+    assert!(has(&Token::Async), "must contain `async`");
+    assert!(has(&Token::Await), "must contain `await`");
+    // Balanced indent/dedent
+    let indents = tokens
+        .iter()
+        .filter(|(t, _)| matches!(t, Token::Indent))
+        .count();
+    let dedents = tokens
+        .iter()
+        .filter(|(t, _)| matches!(t, Token::Dedent))
+        .count();
+    assert_eq!(indents, dedents, "ai_chat.hm indent/dedent must balance");
 }

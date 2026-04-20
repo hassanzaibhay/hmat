@@ -1,170 +1,118 @@
-# Core Language Features — Phase 2 milestone example.
-# Demonstrates: variables, functions, structs, enums, pattern matching,
-#               generics, Result/Option, closures, iterators.
-#
+# HMAT Core Language — Phase 2 milestone.
 # Compile: hmatc core_language.hm
-# Run:     ./core_language
 
-# --- Variables and Type Inference ---
+# ── Variables ─────────────────────────────────────────────────────
 
-fn demo_variables():
-    let name = "HMAT"           # inferred: str
-    let version: int = 2        # explicit annotation
-    let mut counter = 0         # mutable
-    let pi = 3.14159            # inferred: float
-    let active = true           # inferred: bool
+name      = "HMAT"
+pi        = 3.14159
+let version: int = 2     # 'let' is optional but clear
+mut count = 0
+count += 1
 
-    counter += 1
-    print(f"Language: {name} v{version}, counter: {counter}")
-
-# --- Functions and Return Values ---
-
-fn add(a: int, b: int) -> int:
-    a + b    # implicit return — last expression
+# ── Functions ─────────────────────────────────────────────────────
 
 fn greet(name: str) -> str:
-    return f"Hello, {name}! Welcome to HMAT."
+    "Hello, {name}! Welcome to HMAT."
 
-fn divide(a: float, b: float) -> Result<float, str>:
-    if b == 0.0:
-        return Err("Division by zero")
-    return Ok(a / b)
+fn add(a: int, b: int) -> int: a + b      # single-line
 
-# --- Structs ---
+fn divide(a: float, b: float) -> float or Fail:
+    fail "division by zero" if b == 0.0
+    a / b
 
-struct Point:
+# ── Data Shapes ───────────────────────────────────────────────────
+
+shape Point:
     x: float
     y: float
 
     fn new(x: float, y: float) -> Point:
         Point { x, y }
 
-    fn distance(self, other: &Point) -> float:
-        let dx = self.x - other.x
-        let dy = self.y - other.y
-        return (dx^2 + dy^2)  # sqrt when math is available
+    fn distance(self, other: Point) -> float:
+        dx = self.x - other.x
+        dy = self.y - other.y
+        (dx^2 + dy^2).sqrt()
 
     fn display(self) -> str:
-        return f"Point({self.x}, {self.y})"
+        "Point({self.x}, {self.y})"
 
-# --- Enums and Pattern Matching ---
+# ── Sum Types ─────────────────────────────────────────────────────
 
-enum Shape:
-    Circle(float)
-    Rectangle(float, float)
-    Triangle { base: float, height: float }
+type Direction = North | South | East | West
 
-fn area(shape: Shape) -> float:
-    match shape:
-        Shape::Circle(r) -> 3.14159 * r^2
-        Shape::Rectangle(w, h) -> w * h
-        Shape::Triangle { base, height } -> 0.5 * base * height
+type Shape:
+    Circle(radius: float)
+    Rect(width: float, height: float)
+    Triangle(base: float, height: float)
 
-# --- Generics ---
+fn area(s: Shape) -> float:
+    on s:
+        Circle(r)      => 3.14159 * r^2
+        Rect(w, h)     => w * h
+        Triangle(b, h) => 0.5 * b * h
 
-fn max<T: Comparable>(a: T, b: T) -> T:
-    if a > b: return a
-    return b
+# ── Generics ──────────────────────────────────────────────────────
 
-fn first<T>(list: [T]) -> Option<T>:
-    if list.is_empty():
-        return None
-    return Some(list[0])
+fn max[T: Comparable](a: T, b: T) -> T:
+    a if a > b else b
 
-# --- Closures and Iterators ---
+fn first[T](list: [T]) -> T or nil:
+    nil if list.is_empty() else list[0]
 
-fn demo_closures():
-    let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-    # Closures
-    let double = |x| x * 2
-    let is_even = |x| x % 2 == 0
-
-    # Iterator methods
-    let evens = nums.filter(is_even)
-    let doubled = evens.map(double)
-    let total = doubled.sum()
-
-    print(f"Sum of doubled evens: {total}")    # 60
-
-    # List comprehension (equivalent)
-    let comp_result = [x * 2 for x in nums if x % 2 == 0]
-    print(f"Same via comprehension: {comp_result}")
-
-# --- Error Handling ---
+# ── Error Handling ────────────────────────────────────────────────
 
 fn demo_errors():
-    # Pattern matching on Result
-    match divide(10.0, 2.0):
-        Ok(result) -> print(f"10 / 2 = {result}")
-        Err(msg)   -> print(f"Error: {msg}")
+    result = divide(10, 0) or 0.0
+    print("divide(10,0) or 0.0 = {result}")
 
-    match divide(10.0, 0.0):
-        Ok(result) -> print(f"Result: {result}")
-        Err(msg)   -> print(f"Error: {msg}")    # "Error: Division by zero"
+    on divide(10, 2):
+        float as n => print("10 / 2 = {n}")
+        Fail  as e => print("error: {e}")
 
-    # ? operator for propagation
-    fn compute(a: float, b: float) -> Result<float, str>:
-        let result = divide(a, b)?    # propagate error if Err
-        return Ok(result * 2.0)
+    val = first([]) or -1
+    print("first([]) or -1 = {val}")
 
-    match compute(10.0, 2.0):
-        Ok(v) -> print(f"Computed: {v}")     # 10.0
-        Err(e) -> print(f"Failed: {e}")
+# ── Collections ───────────────────────────────────────────────────
 
-    # Option
-    let nums = [1, 2, 3]
-    match first(nums):
-        Some(n) -> print(f"First: {n}")
-        None    -> print("Empty list")
+fn demo_collections():
+    nums   = [1..10]
+    evens  = [x for x in nums if x % 2 == 0]
+    total  = evens.map(x => x * 2).sum()
+    print("sum of doubled evens: {total}")
 
-    let empty: [int] = []
-    let val = first(empty).unwrap_or(-1)
-    print(f"First of empty: {val}")    # -1
+    scores = { "alice": 100, "bob": 95 }
+    top    = scores.get("alice") or 0
+    print("alice: {top}")
 
-# --- Pattern Matching ---
+# ── Pattern Matching ──────────────────────────────────────────────
 
 fn demo_patterns():
-    # Literals
-    let score = 95
-    let grade = match score:
-        90..=100 -> "A"
-        80..=89  -> "B"
-        70..=79  -> "C"
-        _        -> "F"
-    print(f"Grade: {grade}")
+    score = 95
+    grade = on score:
+        n if n >= 90 => "A"
+        n if n >= 80 => "B"
+        n if n >= 70 => "C"
+        _            => "F"
+    print("grade: {grade}")
 
-    # Enum variants
-    let shape = Shape::Rectangle(4.0, 5.0)
-    print(f"Area: {area(shape)}")    # 20.0
+    on Rect(4.0, 5.0):
+        Circle(r)      => print("circle r={r}")
+        Rect(w, h)     => print("rect area={w*h}")
+        Triangle(b, h) => print("triangle")
 
-    # Guards
-    let n = 42
-    match n:
-        x if x > 100 -> print("big")
-        x if x > 0   -> print("positive")    # this fires
-        _             -> print("non-positive")
-
-# --- Main ---
+# ── Main ──────────────────────────────────────────────────────────
 
 fn main():
-    print("=== HMAT Core Language Demo ===")
-
-    demo_variables()
-
-    let greeting = greet("developer")
-    print(greeting)
-
-    let p1 = Point::new(0.0, 0.0)
-    let p2 = Point::new(3.0, 4.0)
-    print(p1.display())
+    print("=== HMAT Core Language ===")
+    print(greet("developer"))
+    print("add(3,4) = {add(3, 4)}")
+    print("max(3,7) = {max(3, 7)}")
+    let p1 = Point.new(0.0, 0.0)
+    let p2 = Point.new(3.0, 4.0)
     print(p2.display())
-
-    print(f"max(3, 7) = {max(3, 7)}")
-    print(f"max(3.14, 2.71) = {max(3.14, 2.71)}")
-
-    demo_closures()
+    print("distance: {p1.distance(p2)}")
     demo_errors()
+    demo_collections()
     demo_patterns()
-
     print("=== Done ===")

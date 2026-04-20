@@ -13,3 +13,4 @@ repository = "https://github.com/hassanzaibhayat/hmat"
 logos = "0.14"
 thiserror = "1"
 clap = { version = "4", features = ["derive"] }
+criterion = { version = "0.5", features = ["html_reports"] }

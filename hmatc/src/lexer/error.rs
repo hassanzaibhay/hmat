@@ -80,7 +80,9 @@ impl LexError {
                     "check for overflow (HMAT `int` is 64-bit) or invalid digits for the base"
                 }
                 "float" => "floats need digits on both sides of the dot, e.g. `3.14` not `3.`",
-                "string" => "check escape sequences — valid escapes are \\n \\t \\r \\\\ \\\" \\' \\0 \\xHH",
+                "string" => {
+                    "check escape sequences — valid escapes are \\n \\t \\r \\\\ \\\" \\' \\0 \\xHH"
+                }
                 _ => "check the literal format against spec §2.5",
             },
             LexError::IndentMismatch { .. } => {

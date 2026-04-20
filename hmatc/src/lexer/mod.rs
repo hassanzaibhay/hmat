@@ -91,9 +91,7 @@ fn raw_tokenize(source: &str) -> Result<Vec<SpannedToken>, LexError> {
 /// literal, classify it so the diagnostic can say so.
 fn literal_kind_from_snippet(snippet: &str) -> Option<&'static str> {
     let first = snippet.chars().next()?;
-    if first == '"' {
-        Some("string")
-    } else if first == 'f' && snippet.starts_with("f\"") {
+    if first == '"' || (first == 'f' && snippet.starts_with("f\"")) {
         Some("string")
     } else if first.is_ascii_digit() {
         if snippet.contains('.') {
@@ -108,10 +106,7 @@ fn literal_kind_from_snippet(snippet: &str) -> Option<&'static str> {
 
 /// Post-processes the raw token stream to emit `Indent`/`Dedent` tokens and
 /// collapse newlines spanning blank or comment-only lines.
-fn inject_indentation(
-    source: &str,
-    raw: Vec<SpannedToken>,
-) -> Result<Vec<SpannedToken>, LexError> {
+fn inject_indentation(source: &str, raw: Vec<SpannedToken>) -> Result<Vec<SpannedToken>, LexError> {
     let mut out: Vec<SpannedToken> = Vec::with_capacity(raw.len());
     let mut indent_stack: Vec<usize> = vec![0];
     let mut at_line_start = true;

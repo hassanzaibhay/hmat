@@ -1,0 +1,180 @@
+# HMAT Data Science — First-Class Operations
+# No third-party packages. Everything built into HMAT.
+# Compile: hmatc data_science.hm
+
+# ── Tensors ───────────────────────────────────────────────────────
+
+fn tensor_demo():
+    let x = tensor[1.0, 2.0, 3.0, 4.0, 5.0]
+    let W = rand(5, 3)
+    let b = zeros(3)
+
+    let y     = x * 2.0
+    let z     = x @ W + b
+    let normed = z / z.norm()
+
+    print("shape: {z.shape}")
+    print("mean:  {z.mean()}")
+
+    let A = tensor[[1.0, 2.0], [3.0, 4.0]]
+    let (U, S, V) = linalg.svd(A)
+    print("singular values: {S}")
+
+# ── DataFrame Operations ──────────────────────────────────────────
+
+fn dataframe_demo():
+    let df = frame.csv("customers.csv")
+
+    print(df.shape)
+    print(df.describe())
+
+    # Query — HMAT pipe style
+    let premium = df
+        | age >= 25
+        | score >= 0.8
+        | sort(-score)
+        | select(name, age, score, city)
+        | take(20)
+
+    # Group and aggregate
+    let by_city = df.group(by: "city"):
+        avg_score:  mean(score)
+        total:      count()
+        max_age:    max(age)
+
+    print(by_city.head(5))
+
+    # Transform
+    df.score  = df.score.scale()
+    df.city   = df.city.encode("label")
+    df.income = df.income.fill_nil(df.income.median())
+
+    let (train, val, test) = data.split(df, ratios: [0.7, 0.15, 0.15], stratify: "bought")
+    df.save_parquet("processed.parquet")
+
+# ── Classical ML ──────────────────────────────────────────────────
+
+fn classical_ml_demo():
+    let df = frame.parquet("processed.parquet")
+    let (train, val, test) = data.split(df, ratios: [0.8, 0.1, 0.1])
+
+    let rf    = learn.forest(target: "bought", trees: 200).train(train)
+    let boost = learn.boost(target: "bought", trees: 500, lr: 0.05).train(train)
+    let lr    = learn.logistic(target: "bought").train(train)
+
+    for (name, model) in [("forest", rf), ("boost", boost), ("logistic", lr)]:
+        let m = model.eval(test)
+        print("{name}: accuracy={m.accuracy:.3f} f1={m.f1:.3f} auc={m.auc_roc:.3f}")
+
+    let search = learn.search(learn.forest(target: "bought"), train):
+        trees:     [100, 200, 500]
+        max_depth: [5, 10, 20]
+        method:    "bayesian"
+
+    print("best params: {search.best_params}")
+    print("best f1:     {search.best_score:.3f}")
+
+    plot.feature_importance(rf.feature_importance(), title: "Purchase drivers")
+    plot.save("importance.png")
+
+# ── Neural Network ────────────────────────────────────────────────
+
+fn neural_net_demo():
+    let df = frame.parquet("processed.parquet")
+    let (train, test) = data.split(df, ratios: [0.85, 0.15])
+
+    let X_train = train.drop("bought").to_tensor()
+    let y_train = train.bought.to_tensor()
+    let X_test  = test.drop("bought").to_tensor()
+    let y_test  = test.bought.to_tensor()
+
+    let net = nn.seq:
+        Dense(X_train.shape[1] => 256, relu)
+        BatchNorm()
+        Dropout(0.3)
+        Dense(256 => 128, relu)
+        Dropout(0.2)
+        Dense(128 => 1, sigmoid)
+
+    let trained = net.fit(X_train, y_train):
+        optimizer: adamw(lr: 0.001, weight_decay: 1e-4)
+        loss:      binary_cross_entropy
+        epochs:    50
+        batch:     64
+        validate:  (X_test, y_test)
+        patience:  7
+        save_best: "best_model.hm"
+
+    plot.figure(rows: 1, cols: 2):
+        [0, 0] => plot.line(trained.history.epochs,
+                            [trained.history.loss, trained.history.val_loss],
+                            labels: ["train", "val"], title: "Loss")
+        [0, 1] => plot.line(trained.history.epochs,
+                            trained.history.val_accuracy,
+                            title: "Validation Accuracy")
+    plot.save("training.png")
+
+    plot.roc_curve(trained, X_test, y_test, title: "ROC Curve")
+    plot.heatmap(trained.confusion_matrix(X_test, y_test), title: "Confusion Matrix")
+    plot.save("evaluation.png")
+
+# ── Statistics ────────────────────────────────────────────────────
+
+fn stats_demo():
+    let df = frame.csv("experiment.csv")
+
+    let control   = (df | group == "control"   | select(score)).to_list()
+    let treatment = (df | group == "treatment" | select(score)).to_list()
+
+    let t = stats.t_test(control, treatment)
+    print("p-value:      {t.p:.4f}")
+    print("significant:  {t.p < 0.05}")
+    print("effect size:  {t.cohens_d:.3f}")
+
+    let dist = stats.normal(mean: stats.mean(control), std: stats.std(control))
+
+    plot.figure(rows: 1, cols: 2):
+        [0, 0] => plot.histogram(control, density: true, title: "Control")
+        [0, 1] => plot.histogram(treatment, density: true, title: "Treatment")
+    plot.save("distributions.png")
+
+# ── AI + DS Integration (unique to HMAT) ─────────────────────────
+
+fn ai_ds_demo():
+    ai analyst = model("anthropic/claude-3-5-sonnet")
+
+    let df = frame.csv("sales.csv")
+
+    # AI-powered feature enrichment
+    flow enrich_features:
+        df.description
+        => analyst.embed
+        => pca(50)
+        => df.semantic_features
+
+    # Train on enriched data
+    let model = learn.boost(target: "revenue", trees: 300).train(df)
+    let metrics = model.eval(df | split == "test")
+    print("test RMSE: {metrics.rmse:.2f}")
+
+    # AI explains low predictions
+    let worst = df | predicted_revenue < 1000 | take(5)
+    for row in worst:
+        let pred = model.predict_single(row)
+        let why  = analyst.think(
+            "Sales model predicted low revenue ({pred}) for product: {row.name}. " +
+            "Region: {row.region}. Explain briefly why."
+        ) or "explanation unavailable"
+        print("{row.name}: {why}")
+
+# ── Main ──────────────────────────────────────────────────────────
+
+fn main():
+    print("=== HMAT Data Science — First-Class Operations ===")
+    tensor_demo()
+    dataframe_demo()
+    classical_ml_demo()
+    neural_net_demo()
+    stats_demo()
+    ai_ds_demo()
+    print("=== Done ===")

@@ -1,4 +1,4 @@
-# HMAT Language Specification v0.2
+# HMAT Language Specification v0.3
 # Type System
 # Author: Hassan Zaib Hayat <hassanzaibhayatske@gmail.com>
 
@@ -6,397 +6,304 @@
 
 ## 1. Overview
 
-HMAT is a **statically typed** language with **full type inference**.
-You never have to write a type annotation, but you may always add one for clarity.
-The type system is **sound** — if it compiles, it is type-safe.
+HMAT is statically typed with full inference.
+Type annotations are optional — write them for clarity, not for the compiler.
+The type system is sound: if it compiles, it is type-safe.
 
-Design goals:
-- Inference is the default; annotations are optional
-- Generics are expressive but don't require `PhantomData` or lifetime annotations in common use
-- Errors are values — no implicit exceptions
-- The compiler always tells you *what* is wrong and *how* to fix it
+No null. No unchecked errors. No implicit coercion.
+The compiler tracks everything; the user annotates nothing unless they want to.
 
 ---
 
 ## 2. Primitive Types
 
-### 2.1 Integer Types
+| Type    | Size  | Notes                  |
+|---------|-------|------------------------|
+| `int`   | 64-bit| default integer        |
+| `i8`..`i128` | — | explicit sizes        |
+| `uint`  | 64-bit| default unsigned       |
+| `u8`..`u128` | — | explicit sizes        |
+| `float` | 64-bit| default float          |
+| `f32`   | 32-bit| explicit               |
+| `f64`   | 64-bit| same as float          |
+| `bool`  | —     | true / false           |
+| `str`   | —     | UTF-8 heap string      |
+| `char`  | 4-byte| Unicode scalar         |
+| `byte`  | 8-bit | alias for u8           |
+| `()`    | —     | unit (no value)        |
 
-| Type   | Size    | Range                                    | Notes            |
-|--------|---------|------------------------------------------|------------------|
-| `i8`   | 8-bit   | -128 to 127                              |                  |
-| `i16`  | 16-bit  | -32,768 to 32,767                        |                  |
-| `i32`  | 32-bit  | -2,147,483,648 to 2,147,483,647          |                  |
-| `i64`  | 64-bit  | -9.2e18 to 9.2e18                        |                  |
-| `i128` | 128-bit | very large                               |                  |
-| `int`  | 64-bit  | alias for `i64`                          | **default**      |
-| `u8`   | 8-bit   | 0 to 255                                 |                  |
-| `u16`  | 16-bit  | 0 to 65,535                              |                  |
-| `u32`  | 32-bit  | 0 to 4,294,967,295                       |                  |
-| `u64`  | 64-bit  | 0 to 1.8e19                              |                  |
-| `u128` | 128-bit | very large                               |                  |
-| `uint` | 64-bit  | alias for `u64`                          |                  |
-| `byte` | 8-bit   | alias for `u8`                           | for raw bytes    |
-
-Integer literals default to `int` unless context requires a different type.
-
-Integer overflow: **panic in debug mode, wrapping in release mode** (configurable).
-
-### 2.2 Float Types
-
-| Type    | Size    | Precision        | Notes       |
-|---------|---------|------------------|-------------|
-| `f32`   | 32-bit  | ~7 decimal digits|             |
-| `f64`   | 64-bit  | ~15 decimal digits|            |
-| `float` | 64-bit  | alias for `f64`  | **default** |
-
-Float literals default to `float` unless annotated.
-
-### 2.3 Boolean
-
-```hmat
-let t: bool = true
-let f: bool = false
-```
-
-### 2.4 Character and String
-
-| Type   | Description                                      |
-|--------|--------------------------------------------------|
-| `char` | A single Unicode scalar value (4 bytes)          |
-| `str`  | UTF-8 encoded, heap-allocated, owned string      |
-
-String operations:
-```hmat
-let s: str = "hello"
-let len = s.length()          # 5
-let upper = s.upper()         # "HELLO"
-let concat = s + " world"     # "hello world"
-let ch: char = s[0]           # 'h'
-let sub = s[1..3]             # "el"
-let interpolated = f"{s} world"
-```
-
-### 2.5 Unit Type
-
-`()` — the unit type. Returned by functions that produce no value.
-
-```hmat
-fn print_greeting(name: str):   # implicitly returns ()
-    print(f"Hello, {name}!")
-```
+Integer overflow: panic in debug, wrapping in release (configurable).
 
 ---
 
 ## 3. Compound Types
 
-### 3.1 Tuples
-
-Fixed-size, heterogeneous. Indexed by position.
+### 3.1 Lists
 
 ```hmat
-let pair: (int, str) = (42, "hello")
-let first = pair.0
-let second = pair.1
+nums: [int] = [1, 2, 3]
+nums.push(4)
+nums.pop()               # returns int or nil
+len = nums.length()
+first = nums[0]          # int — panics if empty
+safe = nums.get(0)       # int or nil — safe
+```
+
+Fixed-size arrays: `[int; 5]` — stack allocated, size known at compile time.
+
+### 3.2 Maps
+
+```hmat
+scores: {str: int} = { "alice": 100 }
+scores["bob"] = 95
+val = scores["alice"]        # int — panics if missing
+val = scores.get("charlie")  # int or nil — safe
+```
+
+### 3.3 Sets
+
+```hmat
+primes: {int} = {2, 3, 5, 7}
+primes.add(11)
+has = primes.contains(3)
+```
+
+### 3.4 Tuples
+
+```hmat
+pair: (int, str) = (42, "hello")
+x = pair.0
+y = pair.1
 
 # Destructuring
-let (x, y) = (1, 2)
-let (name, age, active) = ("Alice", 30, true)
-```
-
-### 3.2 Arrays
-
-**Fixed-size arrays:** stack-allocated, size known at compile time.
-```hmat
-let arr: [int; 5] = [1, 2, 3, 4, 5]
-let first = arr[0]
-let len = arr.length()    # 5, compile-time known
-```
-
-**Dynamic arrays:** heap-allocated, resizable.
-```hmat
-let list: [int] = [1, 2, 3]
-list.push(4)
-list.pop()
-let len = list.length()
-
-# List comprehension
-let squares: [int] = [x^2 for x in 1..=10]
-let evens = [x for x in list if x % 2 == 0]
-```
-
-### 3.3 Maps (Hash Maps)
-
-```hmat
-let scores: {str: int} = { "alice": 100, "bob": 95 }
-scores["charlie"] = 88
-let alice_score = scores["alice"]          # int — panics if missing
-let bob_score = scores.get("bob")          # Option<int> — safe
-let unknown = scores.get("dave").unwrap_or(0)
-```
-
-### 3.4 Sets
-
-```hmat
-let s: {int} = {1, 2, 3, 4, 5}
-s.add(6)
-let has_3 = s.contains(3)    # true
+(a, b) = (1, 2)
 ```
 
 ---
 
-## 4. Option and Result
+## 4. Fallible and Nilable Types
 
-These are built into the language — not just library types.
+These replace `Result<T,E>` and `Option<T>`. No wrapper types.
+The type annotation describes the shape of the value, not a container around it.
 
-### 4.1 Option<T>
+### 4.1 Fallible: `T or Fail`
 
-Represents a value that may or may not be present. Replaces null.
+A function that might fail returns `T or Fail`.
+At the call site, either handle it or provide a default with `or`.
 
 ```hmat
-enum Option<T>:
-    Some(T)
-    None
+divide(a: float, b: float) -> float or Fail:
+    fail "division by zero" if b == 0.0
+    a / b
 
-# Creating
-let maybe: Option<int> = Some(42)
-let nothing: Option<int> = None
+# Default on failure
+result = divide(10, 0) or 0.0
 
-# Using
-match maybe:
-    Some(n) -> print(f"Got {n}")
-    None    -> print("Nothing")
+# Explicit handling
+on divide(10, 0):
+    float as n => use(n)
+    Fail  as e => log(e)
 
-# Shortcuts
-let val = maybe.unwrap()           # panics if None
-let val = maybe.unwrap_or(0)       # default if None
-let val = maybe.unwrap_or_else(|| compute_default())
-let doubled = maybe.map(|n| n * 2)     # Option<int>
-let chained = maybe.and_then(|n| if n > 0: Some(n) else: None)
+# Automatic propagation — no ? needed
+process(input: str) -> float or Fail:
+    n = parse_float(input)    # if this fails, process fails too — automatic
+    divide(n, 2.0)
 ```
 
-### 4.2 Result<T, E>
+### 4.2 Nilable: `T or nil`
 
-Represents an operation that can succeed or fail.
+A value that might not exist. No null. Just `nil`.
 
 ```hmat
-enum Result<T, E>:
-    Ok(T)
-    Err(E)
+first[T](list: [T]) -> T or nil:
+    nil if list.is_empty() else list[0]
 
-# Creating
-fn divide(a: float, b: float) -> Result<float, DivisionError>:
-    if b == 0.0:
-        return Err(DivisionError.ZeroDivision)
-    return Ok(a / b)
+# Default
+val = first([]) or -1
 
-# Using
-match divide(10.0, 2.0):
-    Ok(result) -> print(f"Result: {result}")
-    Err(e)     -> print(f"Error: {e}")
+# Explicit handling
+on first([]):
+    int as n => print("found {n}")
+    nil      => print("empty")
+```
 
-# ? operator — propagate error upward
-fn compute(input: str) -> Result<float, AppError>:
-    let num = parse_float(input)?    # returns Err(AppError) if parse fails
-    let result = divide(num, 2.0)?
-    return Ok(result)
+### 4.3 Both: `T or Fail or nil`
 
-# Combinators
-let doubled = result.map(|n| n * 2)
-let fallback = result.unwrap_or(0.0)
-let mapped_err = result.map_err(|e| AppError::from(e))
+Rare. Only when a function can fail AND legitimately return nil.
+
+```hmat
+find_user(id: int) -> User or Fail or nil:
+    fail "db error" if not db.connected()
+    db.users.get(id)    # nil if not found
 ```
 
 ---
 
 ## 5. Type Inference
 
-The compiler infers types from context. Inference is bidirectional.
+The compiler infers types from context. Bidirectional inference.
 
 ```hmat
-let x = 42              # inferred: int
-let y = 3.14            # inferred: float
-let s = "hello"         # inferred: str
-let b = true            # inferred: bool
+x = 42          # int
+y = 3.14        # float
+s = "hello"     # str
+b = true        # bool
+nums = [1,2,3]  # [int]
 
-let nums = [1, 2, 3]    # inferred: [int]
-let pairs = [(1, "a"), (2, "b")]  # inferred: [(int, str)]
-
-fn identity<T>(x: T) -> T:
-    return x
-
-let result = identity(42)    # T inferred as int
-let result = identity("hi")  # T inferred as str
+result = max(3, 7)      # T inferred as int
+result = max(1.0, 2.0)  # T inferred as float
 ```
 
-When inference fails, the compiler gives a specific error:
+When inference fails, the error is specific:
 ```
 error[E101]: cannot infer type for `x`
-  --> main.hm:3:5
+  --> main.hm:3:1
    |
-3  |     let x = []
-   |         ^ type annotation needed
+3  | x = []
+   | ^ type annotation needed
    |
-   = help: add a type annotation: `let x: [int] = []`
+   = help: add annotation: `x: [int] = []`
 ```
 
 ---
 
-## 6. Generics
+## 6. Generics — `[T]` Not `<T>`
 
-### 6.1 Generic Functions
-
-```hmat
-fn max<T: Comparable>(a: T, b: T) -> T:
-    return a if a > b else b
-
-fn first<T>(list: [T]) -> Option<T>:
-    if list.length() == 0:
-        return None
-    return Some(list[0])
-```
-
-### 6.2 Generic Structs
+Square brackets are used for both collections and generics.
+This is intentional — generics ARE collections of types.
 
 ```hmat
-struct Pair<A, B>:
+# Generic function
+max[T: Comparable](a: T, b: T) -> T:
+    a if a > b else b
+
+# Generic shape
+shape Pair[A, B]:
     first: A
     second: B
 
-    fn swap(self) -> Pair<B, A>:
-        return Pair { first: self.second, second: self.first }
+    swap(self) -> Pair[B, A]:
+        Pair { first: self.second, second: self.first }
 
-let p = Pair { first: 1, second: "hello" }
-let swapped = p.swap()  # Pair<str, int>
+# Multiple bounds
+process[T: Serializable + Comparable](item: T) -> str:
+    item.to_json()
 ```
 
-### 6.3 Trait Bounds
-
-Single bound:
-```hmat
-fn print_all<T: Printable>(items: [T]):
-    for item in items:
-        item.print()
-```
-
-Multiple bounds:
-```hmat
-fn process<T: Serializable + Comparable + Clone>(item: T) -> str:
-    return item.to_json()
-```
-
-Where clause (for complex bounds):
-```hmat
-fn transform<T, U>(items: [T]) -> [U]
-    where T: Into<U>, U: Default:
-    return [item.into() for item in items]
-```
-
-### 6.4 Monomorphization
-
-Generics are compiled via monomorphization — the compiler generates a specialized version for each concrete type used. No runtime overhead.
-
-```hmat
-max(1, 2)         # generates max_int(a: int, b: int) -> int
-max(1.0, 2.0)     # generates max_float(a: float, b: float) -> float
-```
+Generics compile via monomorphization — zero runtime overhead.
 
 ---
 
-## 7. Built-in Traits
+## 7. Shapes and Types
 
-These traits are implemented automatically or have special compiler support:
-
-| Trait        | Methods                          | Auto-derived? | Notes                        |
-|--------------|----------------------------------|---------------|------------------------------|
-| `Clone`      | `clone(self) -> Self`            | `@derive`     | Deep copy                    |
-| `Copy`       | (marker)                         | `@derive`     | Bitwise copy, no move        |
-| `Debug`      | `debug(self) -> str`             | `@derive`     | Debug representation         |
-| `Display`    | `display(self) -> str`           | manual        | Human-readable representation|
-| `Comparable` | `compare(self, other: Self)->int`| manual        | Enables `<`, `>`, etc.       |
-| `Equals`     | `equals(self, other: Self)->bool`| `@derive`     | Enables `==`, `!=`           |
-| `Hash`       | `hash(self) -> uint`             | `@derive`     | For use in maps/sets         |
-| `Into<T>`    | `into(self) -> T`                | manual        | Type conversion              |
-| `From<T>`    | `from(val: T) -> Self`           | manual        | Type conversion (other dir)  |
-| `Default`    | `default() -> Self`              | `@derive`     | Zero-like value              |
-| `Serialize`  | `to_json(self) -> str`           | `@derive`     | JSON serialization           |
-
-### Derive Attribute
+### Shapes (Data Structures)
 
 ```hmat
-@derive(Clone, Debug, Equals, Hash)
-struct Point:
+shape Point:
     x: float
     y: float
 ```
 
----
+Shapes are value types by default (copied on assignment unless large).
+For heap allocation, wrap in a reference — compiler decides (user doesn't annotate).
 
-## 8. Type Coercion
-
-HMAT does **not** do implicit numeric coercion. All conversions are explicit.
-
-```hmat
-let x: i32 = 42
-let y: i64 = x as i64      # explicit cast
-let z: float = x as float
-
-# String conversion
-let s = x.to_str()
-let n = "42".parse::<int>()    # Result<int, ParseError>
-```
-
-The `as` keyword is for lossless or safe casts.  
-For lossy casts (e.g., `i64 → i32`), use `.truncate()` to make the loss explicit.
-
----
-
-## 9. AI Types
-
-These are first-class types for the AI-native features:
+### Types (Sum Types)
 
 ```hmat
-# Model — a handle to an AI model
-let m: Model = load("anthropic/claude-3-5-sonnet")
+type Color = Red | Green | Blue
 
-# Calling the model produces typed outputs
-let reply: str = await m.chat("Hello")
-let code: HmatCode = await m.generate_code("sort a list")
-let summary: str = await m.summarize(long_text)
+type Shape:
+    Circle(radius: float)
+    Rect(width: float, height: float)
 
-# HmatCode — a safe, typed representation of generated HMAT code
-# Cannot be executed directly without an explicit eval() in unsafe context
-let code: HmatCode = await model.generate_code("compute fibonacci")
-# code.source is a str — readable
-# eval(code) is only allowed in unsafe blocks
+type Tree[T]:
+    Leaf(T)
+    Node(left: Tree[T], right: Tree[T])
 ```
 
 ---
 
-## 10. Type Error Examples
+## 8. Built-In Traits
+
+Auto-derived with `@derive`:
+
+```hmat
+@derive(Clone, Debug, Eq, Hash)
+shape Point:
+    x: float
+    y: float
+```
+
+| Trait        | Methods                       | Auto?    |
+|--------------|-------------------------------|----------|
+| `Clone`      | `clone(self) -> Self`         | @derive  |
+| `Copy`       | (marker)                      | @derive  |
+| `Debug`      | `debug(self) -> str`          | @derive  |
+| `Display`    | `display(self) -> str`        | manual   |
+| `Comparable` | `compare(self, Self) -> int`  | manual   |
+| `Eq`         | `eq(self, Self) -> bool`      | @derive  |
+| `Hash`       | `hash(self) -> uint`          | @derive  |
+| `Default`    | `default() -> Self`           | @derive  |
+| `Serialize`  | `to_json(self) -> str`        | @derive  |
+
+---
+
+## 9. Type Coercion
+
+HMAT does NOT do implicit numeric coercion. All conversions are explicit.
+
+```hmat
+x: i32 = 42
+y = x as i64        # explicit
+z = x as float      # explicit
+s = x.to_str()      # to string
+n = "42".parse_int() or 0   # from string
+```
+
+---
+
+## 10. AI Types
+
+```hmat
+# Model — handle to an AI model
+assistant: Model = model("anthropic/claude-3-5-sonnet")
+
+# GenCode — typed AI-generated HMAT code (safe, not raw string)
+code: GenCode = assistant.gen("sort a list by length")
+code.source          # the HMAT source as str
+code.functions       # list of function names
+
+# Executing GenCode requires unsafe
+unsafe:
+    result = eval(code, input: data)
+```
+
+---
+
+## 11. Type Error Examples
 
 ```
 error[E100]: type mismatch
-  --> main.hm:5:18
+  --> main.hm:5:7
    |
-5  |     let x: int = "hello"
-   |                  ^^^^^^^ expected `int`, found `str`
+5  | x: int = "hello"
+   |          ^^^^^^^ expected int, found str
    |
-   = help: remove the type annotation to let inference work, or change the value
+   = help: remove the annotation, or change the value
 
-error[E102]: binary operation `+` not defined for types `int` and `str`
-  --> main.hm:8:15
+error[E102]: + not defined for int and str
+  --> main.hm:8:12
    |
-8  |     let sum = 1 + "two"
-   |                 ^ no implementation of `Add<str>` for `int`
+8  | sum = 1 + "two"
+   |         ^ no Add[str] for int
    |
-   = help: convert the string to an int: `"two".parse::<int>()?`
+   = help: convert str to int: "two".parse_int() or 0
 
-error[E103]: cannot use `None` where `Option<int>` is expected without annotation
-  --> main.hm:12:15
+error[E103]: type of nil binding is ambiguous
+  --> main.hm:12:5
    |
-12 |     let x = None
-   |             ^^^^ type of `None` is ambiguous
+12 | x = nil
+   |     ^^^ cannot infer type
    |
-   = help: add a type annotation: `let x: Option<int> = None`
+   = help: add annotation: x: int or nil = nil
 ```

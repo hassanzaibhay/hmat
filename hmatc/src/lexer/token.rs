@@ -34,10 +34,7 @@ pub enum Token {
     /// Floating-point literal. Requires at least one digit before and after
     /// the decimal point so that `3.max()` tokenizes as `IntLiteral(3) Dot
     /// Identifier` rather than an invalid float.
-    #[regex(
-        r"[0-9][0-9_]*\.[0-9][0-9_]*(?:[eE][+-]?[0-9]+)?",
-        parse_float
-    )]
+    #[regex(r"[0-9][0-9_]*\.[0-9][0-9_]*(?:[eE][+-]?[0-9]+)?", parse_float)]
     FloatLiteral(f64),
 
     // ===== String literals =====
@@ -60,41 +57,76 @@ pub enum Token {
     Nil,
 
     // ===== Keywords =====
-    #[token("fn")] Fn,
-    #[token("let")] Let,
-    #[token("mut")] Mut,
-    #[token("return")] Return,
-    #[token("if")] If,
-    #[token("elif")] Elif,
-    #[token("else")] Else,
-    #[token("match")] Match,
-    #[token("struct")] Struct,
-    #[token("enum")] Enum,
-    #[token("trait")] Trait,
-    #[token("impl")] Impl,
-    #[token("type")] Type,
-    #[token("pub")] Pub,
-    #[token("async")] Async,
-    #[token("await")] Await,
-    #[token("ai")] Ai,
-    #[token("model")] Model,
-    #[token("load")] Load,
-    #[token("pipeline")] Pipeline,
-    #[token("unsafe")] Unsafe,
-    #[token("for")] For,
-    #[token("in")] In,
-    #[token("while")] While,
-    #[token("break")] Break,
-    #[token("continue")] Continue,
-    #[token("import")] Import,
-    #[token("from")] From,
-    #[token("as")] As,
-    #[token("self")] SelfKw,
-    #[token("and")] And,
-    #[token("or")] Or,
-    #[token("not")] Not,
-    #[token("is")] Is,
-    #[token("where")] Where,
+    #[token("fn")]
+    Fn,
+    #[token("let")]
+    Let,
+    #[token("mut")]
+    Mut,
+    #[token("return")]
+    Return,
+    #[token("if")]
+    If,
+    #[token("elif")]
+    Elif,
+    #[token("else")]
+    Else,
+    #[token("match")]
+    Match,
+    #[token("struct")]
+    Struct,
+    #[token("enum")]
+    Enum,
+    #[token("trait")]
+    Trait,
+    #[token("impl")]
+    Impl,
+    #[token("type")]
+    Type,
+    #[token("pub")]
+    Pub,
+    #[token("async")]
+    Async,
+    #[token("await")]
+    Await,
+    #[token("ai")]
+    Ai,
+    #[token("model")]
+    Model,
+    #[token("load")]
+    Load,
+    #[token("pipeline")]
+    Pipeline,
+    #[token("unsafe")]
+    Unsafe,
+    #[token("for")]
+    For,
+    #[token("in")]
+    In,
+    #[token("while")]
+    While,
+    #[token("break")]
+    Break,
+    #[token("continue")]
+    Continue,
+    #[token("import")]
+    Import,
+    #[token("from")]
+    From,
+    #[token("as")]
+    As,
+    #[token("self")]
+    SelfKw,
+    #[token("and")]
+    And,
+    #[token("or")]
+    Or,
+    #[token("not")]
+    Not,
+    #[token("is")]
+    Is,
+    #[token("where")]
+    Where,
 
     // ===== Identifiers (must follow keywords; logos prefers literals) =====
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
@@ -102,60 +134,98 @@ pub enum Token {
 
     // ===== Operators =====
     // Arithmetic
-    #[token("+")] Plus,
-    #[token("-")] Minus,
-    #[token("*")] Star,
-    #[token("/")] Slash,
-    #[token("%")] Percent,
-    #[token("^")] Caret,
+    #[token("+")]
+    Plus,
+    #[token("-")]
+    Minus,
+    #[token("*")]
+    Star,
+    #[token("/")]
+    Slash,
+    #[token("%")]
+    Percent,
+    #[token("^")]
+    Caret,
 
     // Comparison
-    #[token("==")] EqEq,
-    #[token("!=")] NotEq,
-    #[token("<")] Lt,
-    #[token("<=")] LtEq,
-    #[token(">")] Gt,
-    #[token(">=")] GtEq,
+    #[token("==")]
+    EqEq,
+    #[token("!=")]
+    NotEq,
+    #[token("<")]
+    Lt,
+    #[token("<=")]
+    LtEq,
+    #[token(">")]
+    Gt,
+    #[token(">=")]
+    GtEq,
 
     // Assignment
-    #[token("=")] Eq,
-    #[token("+=")] PlusEq,
-    #[token("-=")] MinusEq,
-    #[token("*=")] StarEq,
-    #[token("/=")] SlashEq,
-    #[token("%=")] PercentEq,
+    #[token("=")]
+    Eq,
+    #[token("+=")]
+    PlusEq,
+    #[token("-=")]
+    MinusEq,
+    #[token("*=")]
+    StarEq,
+    #[token("/=")]
+    SlashEq,
+    #[token("%=")]
+    PercentEq,
 
     // Arrows
-    #[token("->")] Arrow,
-    #[token("=>")] FatArrow,
+    #[token("->")]
+    Arrow,
+    #[token("=>")]
+    FatArrow,
 
     // Error propagation
-    #[token("?")] Question,
+    #[token("?")]
+    Question,
 
     // Borrow / bitwise / logical
-    #[token("&")] Ampersand,
-    #[token("|")] Pipe,
-    #[token("!")] Bang,
-    #[token("~")] Tilde,
+    #[token("&")]
+    Ampersand,
+    #[token("|")]
+    Pipe,
+    #[token("!")]
+    Bang,
+    #[token("~")]
+    Tilde,
 
     // Decorators
-    #[token("@")] At,
+    #[token("@")]
+    At,
 
     // ===== Delimiters =====
-    #[token("(")] LParen,
-    #[token(")")] RParen,
-    #[token("{")] LBrace,
-    #[token("}")] RBrace,
-    #[token("[")] LBracket,
-    #[token("]")] RBracket,
+    #[token("(")]
+    LParen,
+    #[token(")")]
+    RParen,
+    #[token("{")]
+    LBrace,
+    #[token("}")]
+    RBrace,
+    #[token("[")]
+    LBracket,
+    #[token("]")]
+    RBracket,
 
     // Punctuation
-    #[token("::")] ColonColon,
-    #[token(":")] Colon,
-    #[token(",")] Comma,
-    #[token("..=")] DotDotEq,
-    #[token("..")] DotDot,
-    #[token(".")] Dot,
+    #[token("::")]
+    ColonColon,
+    #[token(":")]
+    Colon,
+    #[token(",")]
+    Comma,
+    #[token("..=")]
+    DotDotEq,
+    #[token("..")]
+    DotDot,
+    #[token(".")]
+    Dot,
 
     // ===== Significant whitespace =====
     /// Logical end-of-statement. Emitted for the first physical newline after
@@ -237,12 +307,7 @@ fn process_escapes(s: &str) -> Option<String> {
             'x' => {
                 let h1 = chars.next()?;
                 let h2 = chars.next()?;
-                let mut buf = [0u8; 4];
-                let s1 = h1.encode_utf8(&mut buf).to_string();
-                let mut buf2 = [0u8; 4];
-                let s2 = h2.encode_utf8(&mut buf2).to_string();
-                let hex = format!("{}{}", s1, s2);
-                let byte = u8::from_str_radix(&hex, 16).ok()?;
+                let byte = u8::from_str_radix(&format!("{h1}{h2}"), 16).ok()?;
                 out.push(byte as char);
             }
             _ => return None,

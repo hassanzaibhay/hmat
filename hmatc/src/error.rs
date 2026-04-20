@@ -9,6 +9,7 @@ use std::io;
 use thiserror::Error;
 
 use crate::lexer::LexError;
+use crate::parser::ParseError;
 
 /// Top-level error type for the `hmatc` driver.
 #[derive(Debug, Error)]
@@ -20,4 +21,8 @@ pub enum CompilerError {
     /// Lexing failed.
     #[error("lex error: {0}")]
     Lex(#[from] LexError),
+
+    /// Parsing failed.
+    #[error("parse error: {0}")]
+    Parse(#[from] ParseError),
 }

@@ -10,6 +10,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, ValueEnum};
 use hmatc::lexer;
+use hmatc::parser;
 use hmatc::CompilerError;
 
 /// The `hmatc` command-line interface.
@@ -35,7 +36,7 @@ struct Cli {
 enum EmitKind {
     /// The token stream (lexer output).
     Tokens,
-    /// The abstract syntax tree (parser output). Not yet implemented.
+    /// The abstract syntax tree (parser output).
     Ast,
     /// The high-level IR. Not yet implemented.
     Hir,
@@ -59,10 +60,7 @@ fn run(cli: Cli) -> Result<(), CompilerError> {
 
     match cli.emit {
         Some(EmitKind::Tokens) => emit_tokens(&source),
-        Some(EmitKind::Ast) => {
-            eprintln!("error: --emit=ast is not implemented yet (Phase 0)");
-            Ok(())
-        }
+        Some(EmitKind::Ast) => emit_ast(&source),
         Some(EmitKind::Hir) => {
             eprintln!("error: --emit=hir is not implemented yet (Phase 0)");
             Ok(())
@@ -76,7 +74,8 @@ fn run(cli: Cli) -> Result<(), CompilerError> {
             // is to report that full compilation isn't wired up.
             eprintln!(
                 "hmatc: full compilation is not implemented yet. \
-                 Use `--emit=tokens` to inspect lexer output."
+                 Use `--emit=ast` to inspect the parse tree or \
+                 `--emit=tokens` to inspect lexer output."
             );
             Ok(())
         }
@@ -124,4 +123,13 @@ fn format_span(tok: &lexer::Token, span: &lexer::Span) -> String {
         Indent | Dedent => "(injected)".to_string(),
         _ => format!("{}..{}", span.start, span.end),
     }
+}
+
+/// Runs the lexer + parser and prints the AST as an indented tree.
+/// Phase 0 milestone — `hmatc --emit=ast hello_world.hm` produces this output.
+fn emit_ast(source: &str) -> Result<(), CompilerError> {
+    let tokens = lexer::tokenize(source)?;
+    let program = parser::parse(tokens)?;
+    print!("{}", program.pretty_print());
+    Ok(())
 }

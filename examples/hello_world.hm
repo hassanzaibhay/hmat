@@ -1,9 +1,8 @@
 # Hello, World! — The first HMAT program.
-# This is the milestone. When this compiles and runs, Phase 1 is done.
+# Phase 1 milestone: when this compiles and runs, we have a compiler.
 #
 # Compile: hmatc hello_world.hm
 # Run:     ./hello_world
-# Output:  Hello, HMAT!
 
 fn main():
     print("Hello, HMAT!")
