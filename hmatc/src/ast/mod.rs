@@ -55,8 +55,11 @@ pub struct Param {
 
 /// A reference to a type in source. Phase 0 supports:
 ///   - named:    `int`, `Point`
-///   - generic:  `Result<int, str>`
+///   - generic:  `List[int]`, `Result[int, str]`  (spec v0.3 §2.7 / §3.1 — `[T]`, not `<T>`)
 ///   - ref:      `&T`, `&mut T`
+///   - fallible: `T or Fail`
+///   - optional: `T or nil`
+///   - combined: `T or Fail or nil`
 ///
 /// Richer type forms (tuples, arrays, fn types) land when Phase 2 needs them.
 #[derive(Debug, Clone, PartialEq)]
@@ -65,6 +68,11 @@ pub struct TypeRef {
     pub args: Vec<TypeRef>,
     pub is_ref: bool,
     pub is_mut_ref: bool,
+    /// `T or Fail` — a fallible type per spec v0.3 §4. Only legal on
+    /// return-type position today; the parser enforces that.
+    pub is_fallible: bool,
+    /// `T or nil` — an optional type per spec v0.3 §3.1.
+    pub is_nilable: bool,
     pub span: Span,
 }
 
@@ -375,10 +383,17 @@ impl TypeRef {
             (true, false) => "&",
             _ => "",
         };
+        let mut suffix = String::new();
+        if self.is_fallible {
+            suffix.push_str(" or Fail");
+        }
+        if self.is_nilable {
+            suffix.push_str(" or nil");
+        }
         if self.args.is_empty() {
-            let _ = writeln!(out, "Type {}{}", prefix, self.name);
+            let _ = writeln!(out, "Type {}{}{}", prefix, self.name, suffix);
         } else {
-            let _ = writeln!(out, "Type {}{}<>", prefix, self.name);
+            let _ = writeln!(out, "Type {}{}[]{}", prefix, self.name, suffix);
             for arg in &self.args {
                 arg.pretty(out, depth + 1);
             }

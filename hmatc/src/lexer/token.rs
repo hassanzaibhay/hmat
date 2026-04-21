@@ -6,8 +6,8 @@
 //! post-processing pass in [`crate::lexer::tokenize`] based on significant
 //! whitespace at the beginning of logical lines.
 //!
-//! The set of tokens here corresponds to spec v0.2 §2 (Lexical Rules).
-//! See `spec/0.2/grammar.md`.
+//! The set of tokens here corresponds to spec v0.3 §2 (Lexical Rules).
+//! See `spec/0.2/grammar.md` (the v0.3 spec lives at the v0.2 path).
 
 use logos::Logos;
 
@@ -71,18 +71,16 @@ pub enum Token {
     Elif,
     #[token("else")]
     Else,
-    #[token("match")]
-    Match,
-    #[token("struct")]
-    Struct,
-    #[token("enum")]
-    Enum,
-    #[token("trait")]
-    Trait,
-    #[token("impl")]
-    Impl,
+    #[token("on")]
+    On,
+    #[token("shape")]
+    Shape,
     #[token("type")]
     Type,
+    #[token("flow")]
+    Flow,
+    #[token("fail")]
+    Fail,
     #[token("pub")]
     Pub,
     #[token("async")]
@@ -93,10 +91,6 @@ pub enum Token {
     Ai,
     #[token("model")]
     Model,
-    #[token("load")]
-    Load,
-    #[token("pipeline")]
-    Pipeline,
     #[token("unsafe")]
     Unsafe,
     #[token("for")]
@@ -125,8 +119,6 @@ pub enum Token {
     Not,
     #[token("is")]
     Is,
-    #[token("where")]
-    Where,
 
     // ===== Identifiers (must follow keywords; logos prefers literals) =====
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
@@ -180,10 +172,6 @@ pub enum Token {
     Arrow,
     #[token("=>")]
     FatArrow,
-
-    // Error propagation
-    #[token("?")]
-    Question,
 
     // Borrow / bitwise / logical
     #[token("&")]
@@ -336,19 +324,16 @@ impl Token {
             Token::If => "`if`",
             Token::Elif => "`elif`",
             Token::Else => "`else`",
-            Token::Match => "`match`",
-            Token::Struct => "`struct`",
-            Token::Enum => "`enum`",
-            Token::Trait => "`trait`",
-            Token::Impl => "`impl`",
+            Token::On => "`on`",
+            Token::Shape => "`shape`",
             Token::Type => "`type`",
+            Token::Flow => "`flow`",
+            Token::Fail => "`fail`",
             Token::Pub => "`pub`",
             Token::Async => "`async`",
             Token::Await => "`await`",
             Token::Ai => "`ai`",
             Token::Model => "`model`",
-            Token::Load => "`load`",
-            Token::Pipeline => "`pipeline`",
             Token::Unsafe => "`unsafe`",
             Token::For => "`for`",
             Token::In => "`in`",
@@ -363,7 +348,6 @@ impl Token {
             Token::Or => "`or`",
             Token::Not => "`not`",
             Token::Is => "`is`",
-            Token::Where => "`where`",
             Token::Identifier(_) => "identifier",
             Token::Plus => "`+`",
             Token::Minus => "`-`",
@@ -385,7 +369,6 @@ impl Token {
             Token::PercentEq => "`%=`",
             Token::Arrow => "`->`",
             Token::FatArrow => "`=>`",
-            Token::Question => "`?`",
             Token::Ampersand => "`&`",
             Token::Pipe => "`|`",
             Token::Bang => "`!`",

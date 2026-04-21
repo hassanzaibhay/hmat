@@ -107,7 +107,7 @@ fn function_with_mut_param() {
 
 #[test]
 fn function_with_generic_return_type() {
-    let src = "fn lookup(key: str) -> Result<int, str>:\n    return\n";
+    let src = "fn lookup(key: str) -> Result[int, str]:\n    return\n";
     let program = ok(src);
     let Item::Function(f) = &program.items[0];
     let ret = f.return_type.as_ref().expect("return type");
@@ -125,6 +125,54 @@ fn function_with_reference_param() {
     assert!(f.params[0].ty.is_ref);
     assert!(!f.params[0].ty.is_mut_ref);
     assert_eq!(f.params[0].ty.name, "Point");
+}
+
+#[test]
+fn function_with_fallible_return_type() {
+    // Spec v0.3 §3.1 / §4: `-> T or Fail`
+    let src = "fn divide(a: float, b: float) -> float or Fail:\n    return a\n";
+    let program = ok(src);
+    let Item::Function(f) = &program.items[0];
+    let ret = f.return_type.as_ref().expect("return type");
+    assert_eq!(ret.name, "float");
+    assert!(ret.is_fallible, "`or Fail` must set is_fallible");
+    assert!(!ret.is_nilable);
+}
+
+#[test]
+fn function_with_nilable_return_type() {
+    // Spec v0.3 §3.1: `-> T or nil`
+    let src = "fn first(list: int) -> int or nil:\n    return list\n";
+    let program = ok(src);
+    let Item::Function(f) = &program.items[0];
+    let ret = f.return_type.as_ref().expect("return type");
+    assert_eq!(ret.name, "int");
+    assert!(ret.is_nilable, "`or nil` must set is_nilable");
+    assert!(!ret.is_fallible);
+}
+
+#[test]
+fn function_with_fallible_and_nilable_return_type() {
+    // Spec v0.3 §3.1: `-> T or Fail or nil` — both suffixes combine.
+    let src = "fn lookup(k: str) -> str or Fail or nil:\n    return k\n";
+    let program = ok(src);
+    let Item::Function(f) = &program.items[0];
+    let ret = f.return_type.as_ref().expect("return type");
+    assert_eq!(ret.name, "str");
+    assert!(ret.is_fallible);
+    assert!(ret.is_nilable);
+}
+
+#[test]
+fn generic_return_type_with_single_param() {
+    // `[T]` is the spec v0.3 generics syntax — single arg must parse too.
+    let src = "fn wrap(x: int) -> Box[int]:\n    return x\n";
+    let program = ok(src);
+    let Item::Function(f) = &program.items[0];
+    let ret = f.return_type.as_ref().expect("return type");
+    assert_eq!(ret.name, "Box");
+    assert_eq!(ret.args.len(), 1);
+    assert_eq!(ret.args[0].name, "int");
 }
 
 #[test]

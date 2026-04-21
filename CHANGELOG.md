@@ -113,9 +113,76 @@ Phase 0 — Foundation. Lexer landed. Parser landed.
 - `examples/README.md` — index of all examples with phase and status
 - `README.md` — rewritten as a full public project homepage
 
+### Added (2026-04-21 — Type Checker session)
+- `hmatc/src/semantic/types.rs` — Phase 0 type checker (~450 lines):
+  - `Type` enum: `Int`, `Float`, `Str`, `Bool`, `Unit`, `Nil`, `Unknown`
+  - `check(&Program)` public entry point — one-pass tree walk, collects all
+    errors rather than stopping at the first
+  - Two-pass function resolution: pass 1 registers all signatures (enables
+    forward calls), pass 2 checks bodies
+  - Primitive type inference for all literal kinds (int, float, str, bool, nil)
+  - `let` binding checking: infers type from RHS; validates annotation if present;
+    errors when `nil` has no annotation (E101)
+  - Function argument checking: arity (E106), per-argument type (E107)
+  - `return` statement checking against declared return type (E109)
+  - Binary operator type checking — arithmetic on numeric types, comparison
+    producing `bool`, logical `and`/`or` on booleans (E102)
+  - Unary operator checking — `-` on numeric, `not` on bool (E103)
+  - Identifier resolution with scope stack (E104)
+  - Function call resolution (E105)
+  - Type annotation parsing — all sized integer aliases (`i8`–`i128`,
+    `u8`–`u128`), float aliases (`f32`, `f64`), unknown type names (E110)
+  - `Unknown` sentinel suppresses cascading errors after the root cause fires
+  - Phase 0 builtin: `print(str) -> ()` wired in without a stdlib loader
+- `hmatc/src/semantic/mod.rs` — `pub use types::{check, TypeError, Type}`
+- `hmatc/src/error.rs` — `CompilerError::Type` variant; `From<Vec<TypeError>>`
+- `hmatc/src/main.rs` — `--emit=ast` pipeline now runs the type checker after
+  parsing; each `TypeError` printed with its code and `help` line
+- `hmatc/tests/type_checker_tests.rs` — 38 integration tests:
+  happy-path coverage for all primitive types, let bindings, function calls,
+  return types, operators; error-path coverage for every E-code E100–E110;
+  milestone test `cli_emit_ast_hello_world` verifies the full pipeline
+- `docs/type-system.md` — new: phase-0 type system guide (primitives,
+  inference, annotations, operators, error reference)
+- `CHANGELOG.md` — this entry
+
+### Verified (2026-04-21)
+- `cargo test --workspace` — **171 passed, 0 failed, 3 ignored**
+  (68 lexer + 63 parser + 38 type checker + 2 doc tests)
+- `cargo clippy --workspace --all-targets -- -D warnings` — zero warnings
+- `cargo fmt --check` — clean
+- Milestone: `hmatc --emit=ast examples/hello_world.hm` type-checks with
+  zero errors
+
+### Audited (2026-04-21 — Foundation audit session)
+- Foundation audit complete — lexer, parser, AST vs spec v0.3.
+- See `audit/FOUNDATION-AUDIT-2026.md` for full findings.
+- Three HIGH RISK spec-drift items found and fixed in the same session:
+  - **Lexer keywords** aligned to spec v0.3: added `shape` / `on` / `flow` /
+    `fail`; removed obsolete `match` / `struct` / `enum` / `trait` / `impl` /
+    `load` / `pipeline` / `where` / `?` variants.
+  - **Parser generics** now use `[T]` (spec v0.3 §2.7 / §3.1) instead of
+    `<T>`. `<` and `>` remain comparison operators only.
+  - **Return types** now accept fallible/optional suffixes per spec v0.3
+    §3.1 / §4: `-> T or Fail`, `-> T or nil`, `-> T or Fail or nil`.
+    `TypeRef` gained `is_fallible` / `is_nilable` flags; new
+    `parse_return_type()` helper restricts these suffixes to return position.
+- Test updates: lexer keyword cases refreshed; 4 new parser tests
+  (`function_with_fallible_return_type`, `function_with_nilable_return_type`,
+  `function_with_fallible_and_nilable_return_type`,
+  `generic_return_type_with_single_param`); existing
+  `function_with_generic_return_type` switched from `<...>` to `[...]`;
+  `ai_model_decl_tokenizes` updated to spec-v0.3 form.
+
+### Verified (2026-04-21 — post-audit)
+- `cargo test --workspace` — **177 passed, 0 failed, 3 ignored**
+  (69 lexer + 67 parser + 38 type checker + 3 doc tests)
+- `cargo clippy --workspace --all-targets -- -D warnings` — clean
+- Milestone: `hmatc --emit=ast examples/hello_world.hm` — still end-to-end green
+
 ### Next
-- Basic type checker (semantic analysis pass)
-- Hello World end-to-end compilation (LLVM codegen bootstrap)
+- LLVM IR codegen bootstrap (Phase 1 milestone)
+- Hello World end-to-end: source → binary → executable
 
 ---
 
@@ -123,7 +190,7 @@ Phase 0 — Foundation. Lexer landed. Parser landed.
 
 | Milestone            | Description                          | Status      |
 |----------------------|--------------------------------------|-------------|
-| v0.1.0 — Foundation  | Lexer + Parser + basic type checker  | 🔲 Pending  |
+| v0.1.0 — Foundation  | Lexer + Parser + basic type checker  | ✅ Done     |
 | v0.2.0 — Hello World | Compiles and runs first program      | 🔲 Pending  |
 | v0.3.0 — Core        | Functions, structs, enums, generics  | 🔲 Pending  |
 | v0.4.0 — AI Native   | ai model, await, pipeline            | 🔲 Pending  |

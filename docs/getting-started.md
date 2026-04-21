@@ -9,7 +9,7 @@ If you're here for the AI-native features — you're in the right place.
 
 ## Install
 
-> **Status:** `hmatc` is under active development (Phase 0 in progress — lexer ✅ and parser ✅ done).
+> **Status:** Phase 0 complete — lexer ✅, parser ✅, type checker ✅. `hmatc --emit=ast` is working.
 > Installation instructions will be published when the first binary ships (Phase 1 milestone).
 > To build from source today, see the [compiler build instructions](#building-from-source) below.
 
@@ -196,6 +196,7 @@ You've seen the core. Where you go next depends on what you're building:
 | I want to...                         | Read this                                    |
 |--------------------------------------|----------------------------------------------|
 | Learn the full syntax                | [Syntax Guide](syntax-guide.md)              |
+| Understand types and type errors     | [Type System Guide](type-system.md)          |
 | Understand memory / ownership        | [Ownership Guide](ownership-guide.md)        |
 | Build AI-powered programs            | [AI Guide](ai-guide.md)                      |
 | Handle errors properly               | [Error Handling Guide](error-handling.md)    |
@@ -208,5 +209,6 @@ You've seen the core. Where you go next depends on what you're building:
 ## See Also
 
 - [Syntax Guide](syntax-guide.md) — complete language reference
+- [Type System Guide](type-system.md) — types, inference, error codes E100–E110
 - [Examples](../examples/README.md) — learn by reading real programs
 - [CHANGELOG](../CHANGELOG.md) — what's been built, what's coming

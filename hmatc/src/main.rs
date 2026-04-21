@@ -11,6 +11,7 @@ use std::process::ExitCode;
 use clap::{Parser, ValueEnum};
 use hmatc::lexer;
 use hmatc::parser;
+use hmatc::semantic;
 use hmatc::CompilerError;
 
 /// The `hmatc` command-line interface.
@@ -125,11 +126,20 @@ fn format_span(tok: &lexer::Token, span: &lexer::Span) -> String {
     }
 }
 
-/// Runs the lexer + parser and prints the AST as an indented tree.
-/// Phase 0 milestone — `hmatc --emit=ast hello_world.hm` produces this output.
+/// Runs the lexer + parser + type checker and prints the AST as an
+/// indented tree. Phase 0 milestone — `hmatc --emit=ast hello_world.hm`
+/// produces this output. Any type errors are reported to stderr before
+/// the driver returns a failure exit code.
 fn emit_ast(source: &str) -> Result<(), CompilerError> {
     let tokens = lexer::tokenize(source)?;
     let program = parser::parse(tokens)?;
+    if let Err(errors) = semantic::check(&program) {
+        for e in &errors {
+            eprintln!("error[{}]: {}", e.code(), e);
+            eprintln!("   = help: {}", e.help());
+        }
+        return Err(CompilerError::Type(errors.len()));
+    }
     print!("{}", program.pretty_print());
     Ok(())
 }

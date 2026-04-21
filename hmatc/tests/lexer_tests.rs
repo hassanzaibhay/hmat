@@ -49,19 +49,16 @@ fn every_keyword_lexes_to_its_variant() {
         ("if", Token::If),
         ("elif", Token::Elif),
         ("else", Token::Else),
-        ("match", Token::Match),
-        ("struct", Token::Struct),
-        ("enum", Token::Enum),
-        ("trait", Token::Trait),
-        ("impl", Token::Impl),
+        ("on", Token::On),
+        ("shape", Token::Shape),
         ("type", Token::Type),
+        ("flow", Token::Flow),
+        ("fail", Token::Fail),
         ("pub", Token::Pub),
         ("async", Token::Async),
         ("await", Token::Await),
         ("ai", Token::Ai),
         ("model", Token::Model),
-        ("load", Token::Load),
-        ("pipeline", Token::Pipeline),
         ("unsafe", Token::Unsafe),
         ("for", Token::For),
         ("in", Token::In),
@@ -76,7 +73,6 @@ fn every_keyword_lexes_to_its_variant() {
         ("or", Token::Or),
         ("not", Token::Not),
         ("is", Token::Is),
-        ("where", Token::Where),
         ("true", Token::True),
         ("false", Token::False),
         ("nil", Token::Nil),
@@ -341,14 +337,13 @@ fn assignment_compound_operators() {
 }
 
 #[test]
-fn arrows_and_question_and_sigils() {
-    let t = toks("-> => ? & | ! ~ @");
+fn arrows_and_sigils() {
+    let t = toks("-> => & | ! ~ @");
     assert_eq!(
         t,
         vec![
             Token::Arrow,
             Token::FatArrow,
-            Token::Question,
             Token::Ampersand,
             Token::Pipe,
             Token::Bang,
@@ -551,26 +546,37 @@ fn hello_world_tokenizes_end_to_end() {
 
 #[test]
 fn ai_model_decl_tokenizes() {
-    let src = r#"ai model assistant = load("anthropic/claude-3-5-sonnet")"#;
+    // Spec v0.3 §3.8: `ai name = model("provider/model"): ...`
+    let src = r#"ai assistant = model("anthropic/claude-3-5-sonnet")"#;
     let t = toks(src);
     assert_eq!(t[0], Token::Ai);
-    assert_eq!(t[1], Token::Model);
-    assert_eq!(t[2], Token::Identifier("assistant".into()));
-    assert_eq!(t[3], Token::Eq);
-    assert_eq!(t[4], Token::Load);
-    assert_eq!(t[5], Token::LParen);
+    assert_eq!(t[1], Token::Identifier("assistant".into()));
+    assert_eq!(t[2], Token::Eq);
+    assert_eq!(t[3], Token::Model);
+    assert_eq!(t[4], Token::LParen);
     assert_eq!(
-        t[6],
+        t[5],
         Token::StringLiteral("anthropic/claude-3-5-sonnet".into())
     );
-    assert_eq!(t[7], Token::RParen);
+    assert_eq!(t[6], Token::RParen);
 }
 
 #[test]
-fn error_propagation_operator_tokenizes() {
-    let src = "let x = foo()?";
+fn fail_keyword_tokenizes() {
+    // Spec v0.3 §4: `fail "msg"` is the raise-fail statement.
+    let src = r#"fail "oops""#;
     let t = toks(src);
-    assert!(t.contains(&Token::Question));
+    assert_eq!(t[0], Token::Fail);
+    assert_eq!(t[1], Token::StringLiteral("oops".into()));
+}
+
+#[test]
+fn shape_on_flow_keywords_tokenize() {
+    // Spec v0.3 §3.4 / §3.6 / §3.7.
+    let t = toks("shape on flow");
+    assert_eq!(t[0], Token::Shape);
+    assert_eq!(t[1], Token::On);
+    assert_eq!(t[2], Token::Flow);
 }
 
 // ======================================================================
@@ -974,12 +980,14 @@ fn core_language_example_tokenizes_without_errors() {
         result.unwrap_err()
     );
     let tokens = result.unwrap();
-    // Spot-check: must contain fn, struct, enum, match keywords
+    // Spot-check: must contain fn, type, for, or keywords (core_language.hm
+    // uses HMAT-native `shape`/`type`/`on`; `struct`/`enum`/`match` are
+    // reserved but absent from this example).
     let has = |tok: &Token| tokens.iter().any(|(t, _)| t == tok);
     assert!(has(&Token::Fn), "must contain `fn`");
-    assert!(has(&Token::Struct), "must contain `struct`");
-    assert!(has(&Token::Enum), "must contain `enum`");
-    assert!(has(&Token::Match), "must contain `match`");
+    assert!(has(&Token::Type), "must contain `type`");
+    assert!(has(&Token::For), "must contain `for`");
+    assert!(has(&Token::Or), "must contain `or`");
     // Balanced indent/dedent
     let indents = tokens
         .iter()
@@ -1005,11 +1013,12 @@ fn ai_chat_example_tokenizes_without_errors() {
         result.unwrap_err()
     );
     let tokens = result.unwrap();
-    // Spot-check: must contain ai, model, load, async, await keywords
+    // Spot-check: must contain ai, model, from, async, await keywords
+    // (`load` is a reserved token but is not used in this example).
     let has = |tok: &Token| tokens.iter().any(|(t, _)| t == tok);
     assert!(has(&Token::Ai), "must contain `ai`");
     assert!(has(&Token::Model), "must contain `model`");
-    assert!(has(&Token::Load), "must contain `load`");
+    assert!(has(&Token::From), "must contain `from`");
     assert!(has(&Token::Async), "must contain `async`");
     assert!(has(&Token::Await), "must contain `await`");
     // Balanced indent/dedent

@@ -209,7 +209,7 @@ impl Parser {
 
         let return_type = if matches!(self.peek(), Some(Token::Arrow)) {
             self.advance();
-            Some(self.parse_type()?)
+            Some(self.parse_return_type()?)
         } else {
             None
         };
@@ -305,9 +305,10 @@ impl Parser {
             }
         };
 
+        // Generic arguments use `[T]` per spec v0.3 §2.7 / §3.1.
         let mut end = name_span.end;
         let mut args = Vec::new();
-        if matches!(self.peek(), Some(Token::Lt)) {
+        if matches!(self.peek(), Some(Token::LBracket)) {
             self.advance();
             loop {
                 args.push(self.parse_type()?);
@@ -317,7 +318,7 @@ impl Parser {
                     break;
                 }
             }
-            let close = self.expect(&Token::Gt, "`>` to close generic arguments")?;
+            let close = self.expect(&Token::RBracket, "`]` to close generic arguments")?;
             end = close.1.end;
         }
 
@@ -326,8 +327,44 @@ impl Parser {
             args,
             is_ref,
             is_mut_ref,
+            is_fallible: false,
+            is_nilable: false,
             span: start..end,
         })
+    }
+
+    /// Parses a return type — the same as [`parse_type`] but with optional
+    /// trailing `or Fail` / `or nil` / `or Fail or nil` per spec v0.3 §3.1
+    /// / §4. These suffixes are legal only on return positions; plain type
+    /// positions (parameters, annotations) reject them by virtue of not
+    /// calling this function.
+    fn parse_return_type(&mut self) -> Result<TypeRef, ParseError> {
+        let mut ty = self.parse_type()?;
+
+        loop {
+            if !matches!(self.peek(), Some(Token::Or)) {
+                break;
+            }
+            // Lookahead: next after `or` must be `Fail` or `nil`.
+            let next = self.tokens.get(self.pos + 1).map(|(t, _)| t.clone());
+            match next {
+                Some(Token::Identifier(ref n)) if n == "Fail" => {
+                    self.advance(); // consume `or`
+                    let (_, span) = self.advance().expect("peeked Fail identifier");
+                    ty.is_fallible = true;
+                    ty.span.end = span.end;
+                }
+                Some(Token::Nil) => {
+                    self.advance(); // consume `or`
+                    let (_, span) = self.advance().expect("peeked `nil`");
+                    ty.is_nilable = true;
+                    ty.span.end = span.end;
+                }
+                _ => break,
+            }
+        }
+
+        Ok(ty)
     }
 
     // ------------------------------------------------------------------
@@ -794,7 +831,8 @@ impl ParseError {
             }
             ParseError::ExpectedType { .. } => {
                 "this position needs a type annotation — e.g. `int`, `str`, \
-                 `Point`, `Result<int, str>`, `&Point`"
+                 `Point`, `Result[int, str]`, `&Point`, or a fallible/optional \
+                 form like `int or Fail` / `int or nil` on return types"
             }
             ParseError::EmptyBlock { .. } => {
                 "a block cannot be empty — add at least one statement, or use \
