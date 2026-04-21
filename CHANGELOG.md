@@ -10,7 +10,7 @@ This file is maintained by the **Docs Agent** and updated after every session.
 ## [Unreleased]
 
 ### Status
-Phase 0 — Foundation. Lexer landed. Parser landed.
+Phase 1 — Hello World Compiles. C codegen via clang landed. `hmatc examples/hello_world.hm` produces a native binary.
 
 ### Added (2026-04-19 — Parser session)
 - `hmatc/src/ast/mod.rs` — AST node types for Phase 0: `Program`, `Item`,
@@ -180,9 +180,92 @@ Phase 0 — Foundation. Lexer landed. Parser landed.
 - `cargo clippy --workspace --all-targets -- -D warnings` — clean
 - Milestone: `hmatc --emit=ast examples/hello_world.hm` — still end-to-end green
 
+### Added (2026-04-21 — Phase 1: C Codegen session)
+- `hmatc/src/codegen/c.rs` — C11 emitter (~300 lines) that walks the AST and
+  produces self-contained C source ready for `clang`:
+  - Type mapping: `int → int64_t`, `float → double`, `bool → bool`,
+    `str → const char *`, `() → void`. All sized integer aliases
+    (`i8`–`i128`, `u8`–`u128`, `f32`, `f64`) mapped to correct C types.
+  - Literals: integers suffixed `LL` for 64-bit safety; floats guaranteed to
+    carry a decimal point via `{:?}`; strings and f-strings escape-encoded
+    to ASCII-only C literals (UTF-8 via `\xNN`).
+  - `print(x)` builtin lowered to `printf("%s\n", x)`.
+  - `^` exponentiation lowered to `pow()` (libm).
+  - `and`/`or` lowered to `&&`/`||`.
+  - `let` bindings: explicit type annotation respected; unannotated bindings
+    use `__auto_type` (clang/gcc extension) so clang infers from the RHS.
+  - `mut` / immutable mapped to absent / `const` qualifier.
+  - `fn main()` auto-receives `int` return type and a trailing `return 0;`
+    when the source omits both.
+- `hmatc/src/codegen/mod.rs` — public `emit_c(program: &Program) -> String`
+  entry point; module-level doc explains the C-via-clang strategy and the
+  planned migration to `inkwell` once it supports LLVM 18+.
+- `hmatc/src/main.rs` — full compile pipeline:
+  - `compile()`: source → C → disk → `clang -O2 -std=c11` → native binary.
+    Intermediate `.c` file deleted on success; kept on failure for inspection.
+  - `find_clang()`: searches `PATH` first, falls back to
+    `C:\Program Files\LLVM\bin\clang.exe` on Windows.
+  - `--emit=c` flag: prints generated C source to stdout (no binary produced).
+  - `--emit=llvm-ir` flag: prints a placeholder explaining the inkwell
+    LLVM 18+ gate rather than crashing.
+  - `-o <path>` flag: override the output binary path.
+  - `exe_suffix()`: appends `.exe` on Windows automatically.
+- `hmatc/src/error.rs` — two new `CompilerError` variants:
+  - `ClangNotFound` — friendly message with install instructions.
+  - `ClangFailed(i32)` — reports clang's exit code; clang's own stderr is
+    already visible on the terminal.
+
+### Verified (2026-04-21 — Phase 1)
+- `where clang` / `C:\Program Files\LLVM\bin\clang.exe` — present.
+- `cargo test --workspace` — all green (count from prior session: 177 passed).
+- `hmatc examples/hello_world.hm` — produces `hello_world.exe`.
+- `.\hello_world.exe` — prints `Hello, HMAT!`.
+- Milestone **v0.2.0** achieved: first end-to-end compile.
+
+### Security (2026-04-21 — Phase 1 security fix session)
+Fixes for the Phase 1 audit findings. See `security/SESSION-2026-04-21.md`
+(Phase 1 Security Fix Session addendum) for the full write-up.
+
+- **HIGH (CWE-427) — Clang resolved without trusting PATH.**
+  `hmatc/src/driver.rs` (new) owns the toolchain lookup. `find_on_path_in`
+  walks `$PATH` manually, skips empty / relative / CWD-equivalent entries,
+  and returns an absolute `PathBuf`. `main.rs::compile` now hands the
+  absolute path to `Command::new` — `Command::new("clang")` with a bare
+  name is gone.
+- **MEDIUM — Argument smuggling via filename / `-o` override.**
+  `driver::validate_output_name` rejects any name starting with `-` with
+  `CompilerError::InvalidOutputName` (code **E005**). Both the input-file
+  stem and the `-o` override's file name are validated.
+  `driver::absolute_output_paths` anchors the generated `.c` and the
+  output binary at the absolute CWD — the compile command passed to
+  `clang` never contains a bare relative path.
+- **MEDIUM — `\xNN` run-on in `escape_c_string`.**
+  `codegen/c.rs::escape_c_string` now emits non-ASCII / control bytes as
+  three-digit octal escapes (`\NNN`). Hex escapes in C read unlimited
+  hex digits and could fold adjacent characters into one wide code point.
+  Octal escapes self-terminate at three digits. `\0` folded into the
+  same branch (`\000`) for consistency.
+- **LOW — `.gitignore`.** Added an "hmatc outputs" section ignoring
+  `*.exe` and generated `*.c` so Phase 1 build artifacts stay out of
+  git. (`hmatc` itself has no hand-written C — it's a Rust crate — so
+  the blanket `*.c` rule is safe.)
+- **Tests:** `hmatc/tests/driver_tests.rs` (new, 9 tests) covers both
+  fixes: CWD-skip, relative-entry skip, empty-entry skip, positive
+  lookup, stem validation, `-o` validation, absolute-path anchoring,
+  relative-override promotion.
+- **Verified:** `cargo test --workspace` — **221 passed / 0 failed /
+  3 ignored** (35 codegen + 9 driver + 69 lexer + 67 parser + 38
+  type-checker + 3 doc). `cargo clippy -- -D warnings` clean. End-to-end
+  `hmatc examples/hello_world.hm` → `hello_world.exe` → `Hello, HMAT!`
+  re-verified; the `hmatc: wrote …` line now reports an absolute path.
+
 ### Next
-- LLVM IR codegen bootstrap (Phase 1 milestone)
-- Hello World end-to-end: source → binary → executable
+- Phase 2: functions, closures, structs (`shape`), sum types (`type`),
+  pattern matching (`on`), generics, ownership checker (lite).
+- LLVM IR backend (swap in `inkwell` once it supports LLVM 18+).
+- Carried security work: F-2 / F-9 (parser + type-checker depth caps),
+  F-6 (fuzz harness), F-4 (`cargo-audit` / `cargo-deny`), F-3 (source
+  size cap), F-7 (`\xHH` spec clarification).
 
 ---
 
@@ -191,7 +274,7 @@ Phase 0 — Foundation. Lexer landed. Parser landed.
 | Milestone            | Description                          | Status      |
 |----------------------|--------------------------------------|-------------|
 | v0.1.0 — Foundation  | Lexer + Parser + basic type checker  | ✅ Done     |
-| v0.2.0 — Hello World | Compiles and runs first program      | 🔲 Pending  |
+| v0.2.0 — Hello World | Compiles and runs first program      | ✅ Done     |
 | v0.3.0 — Core        | Functions, structs, enums, generics  | 🔲 Pending  |
 | v0.4.0 — AI Native   | ai model, await, pipeline            | 🔲 Pending  |
 | v0.5.0 — Toolchain   | hpkg, hfmt, hmat-lsp                 | 🔲 Pending  |

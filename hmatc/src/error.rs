@@ -33,6 +33,27 @@ pub enum CompilerError {
     /// a sensible message.
     #[error("type check failed with {0} error(s)")]
     Type(usize),
+
+    /// `clang` could not be located on this system. Phase 1 needs it to
+    /// turn the emitted C source into a native binary.
+    #[error(
+        "clang not found — install LLVM and ensure `clang` is on PATH, \
+         or place it at `C:\\Program Files\\LLVM\\bin\\clang.exe`"
+    )]
+    ClangNotFound,
+
+    /// `clang` ran but exited with a non-zero status. The stderr from
+    /// clang is printed to the user's terminal before this is returned.
+    #[error("clang failed with exit status {0}")]
+    ClangFailed(i32),
+
+    /// An output path (input-file stem or `-o` override) begins with `-`,
+    /// which `clang` would interpret as a flag. Refuse rather than smuggle.
+    #[error(
+        "E005: invalid output name '{0}' — names starting with '-' are \
+         rejected to prevent argument smuggling into the C compiler"
+    )]
+    InvalidOutputName(String),
 }
 
 impl From<Vec<TypeError>> for CompilerError {

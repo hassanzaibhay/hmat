@@ -53,6 +53,13 @@ examples/*.bin
 a.out
 
 # ============================================================
+# hmatc outputs — .c is intermediate, .exe is the final binary
+# (hmatc itself is a Rust crate, so it has no hand-written .c sources)
+# ============================================================
+*.exe
+*.c
+
+# ============================================================
 # Editor and OS artifacts
 # ============================================================
 .vscode/settings.json

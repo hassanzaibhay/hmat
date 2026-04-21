@@ -9,19 +9,21 @@ If you're here for the AI-native features — you're in the right place.
 
 ## Install
 
-> **Status:** Phase 0 complete — lexer ✅, parser ✅, type checker ✅. `hmatc --emit=ast` is working.
-> Installation instructions will be published when the first binary ships (Phase 1 milestone).
-> To build from source today, see the [compiler build instructions](#building-from-source) below.
+> **Status:** Phase 1 complete — `hmatc` compiles `.hm` files to native binaries via C codegen + clang.
+> **Prerequisite:** [LLVM/clang](https://releases.llvm.org/) must be on your PATH (or installed at the standard
+> Windows path `C:\Program Files\LLVM\bin\clang.exe`).
+> To build the compiler from source, see [Building from Source](#building-from-source) below.
 
 ### Building from Source
 
-You'll need [Rust](https://rustup.rs) (stable, 1.75+) and a C toolchain for LLVM.
+You'll need [Rust](https://rustup.rs) (stable, 1.75+) and [LLVM/clang](https://releases.llvm.org/) for the compile step.
 
 ```bash
 git clone https://github.com/hassanzaibhayat/hmat
 cd hmat
 cargo build --release --workspace
-# Binary lands at: target/release/hmatc
+# Compiler lands at: target/release/hmatc
+# Add it to your PATH or invoke it with the full path.
 ```
 
 ---
@@ -38,8 +40,13 @@ fn main():
 Compile and run:
 
 ```bash
+# Linux / macOS
 hmatc hello.hm
 ./hello
+
+# Windows
+hmatc hello.hm
+.\hello.exe
 ```
 
 Output:
@@ -50,6 +57,10 @@ Hello, HMAT!
 
 That's it. No semicolons. No `public static void main`. No class wrapping a static method.
 Just your intent, on the page.
+
+> **How it works (Phase 1):** `hmatc` emits C11 source and invokes `clang -O2` to
+> produce the binary. The intermediate `.c` file is deleted on success.
+> Use `hmatc --emit=c hello.hm` to inspect the generated C.
 
 ---
 
