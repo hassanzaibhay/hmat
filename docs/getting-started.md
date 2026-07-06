@@ -10,8 +10,8 @@ If you're here for the AI-native features — you're in the right place.
 ## Install
 
 > **Status:** Phase 1 complete — `hmatc` compiles `.hm` files to native binaries via C codegen + clang.
-> **Prerequisite:** [LLVM/clang](https://releases.llvm.org/) must be on your PATH (or installed at the standard
-> Windows path `C:\Program Files\LLVM\bin\clang.exe`).
+> **Prerequisite:** [LLVM/clang](https://releases.llvm.org/) must be on your PATH. On Windows,
+> `hmatc` also falls back to the default LLVM install location under `%ProgramFiles%\LLVM\bin\`.
 > To build the compiler from source, see [Building from Source](#building-from-source) below.
 
 ### Building from Source
@@ -19,7 +19,7 @@ If you're here for the AI-native features — you're in the right place.
 You'll need [Rust](https://rustup.rs) (stable, 1.75+) and [LLVM/clang](https://releases.llvm.org/) for the compile step.
 
 ```bash
-git clone https://github.com/hassanzaibhayat/hmat
+git clone https://github.com/hassanzaibhay/hmat
 cd hmat
 cargo build --release --workspace
 # Compiler lands at: target/release/hmatc

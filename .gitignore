@@ -6,16 +6,19 @@
 # --- Claude brain and prompts (NEVER push) ---
 CLAUDE.md
 prompts/
+.claude/
 
 # --- Runner scripts (local workflow tooling, never push) ---
 Makefile
 run.py
 run.ps1
+__pycache__/
 
 # --- Local session/report scratch files ---
 clean/
 security/
 qa/
+audit/
 docs/bugs/
 *.session.md
 

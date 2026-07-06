@@ -79,7 +79,7 @@ for the full plan.
 You'll need [Rust](https://rustup.rs) (stable, 1.75+).
 
 ```bash
-git clone https://github.com/hassanzaibhayat/hmat
+git clone https://github.com/hassanzaibhay/hmat
 cd hmat
 cargo build --release --workspace
 # Compiler: target/release/hmatc
@@ -141,10 +141,9 @@ See [spec/roadmap.md](spec/roadmap.md) for the full design decisions log.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute.
-
-The project uses a 7-agent development system (Dev, Test, Debug, QA, Security, Docs, Clean).
-If you're contributing code, read [INSTRUCTIONS.md](INSTRUCTIONS.md) first.
+Clone the repo, build with `cargo build --workspace`, and run
+`cargo test --workspace` before sending a change. Every feature needs a test
+and a working example — see [Quality Standards](docs/design-philosophy.md#quality-standards).
 
 ---
 

@@ -27,8 +27,9 @@ C11 source and invokes `clang` to produce the binary — the same pragmatic stra
 used by early Rust and Haxe. A native LLVM IR backend (`inkwell`) will replace this
 once `inkwell` supports LLVM 18+.
 
-**Prerequisite:** `clang` must be on your PATH, or installed at
-`C:\Program Files\LLVM\bin\clang.exe` on Windows.
+**Prerequisite:** `clang` must be on your PATH. On Windows, `hmatc` also
+checks the default LLVM install location under `%ProgramFiles%\LLVM\bin\`
+as a fallback.
 
 ### Basic Usage
 

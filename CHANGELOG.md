@@ -3,7 +3,7 @@
 All notable changes to the HMAT programming language are documented here.
 
 Format: `[Unreleased]` for work in progress, `[vX.Y.Z - YYYY-MM-DD]` for releases.  
-This file is maintained by the **Docs Agent** and updated after every session.
+This file is updated after every development session.
 
 ---
 
@@ -89,10 +89,6 @@ Phase 1 — Hello World Compiles. C codegen via clang landed. `hmatc examples/he
 - Spec v0.2: language grammar, type system, ownership model, AI constructs
 - Initial documentation scaffolding
 - Project architecture defined
-- Agent system designed (7 agents: dev, test, debug, qa, security, docs, clean)
-- CLAUDE.md: full project brain
-- INSTRUCTIONS.md: development workflow
-- FIRST_PROMPT.md: ignition for Phase 0
 
 ### Known Issues
 - (resolved) `cargo test --workspace` — previously unverified on the author's
@@ -258,6 +254,17 @@ Fixes for the Phase 1 audit findings. See `security/SESSION-2026-04-21.md`
   type-checker + 3 doc). `cargo clippy -- -D warnings` clean. End-to-end
   `hmatc examples/hello_world.hm` → `hello_world.exe` → `Hello, HMAT!`
   re-verified; the `hmatc: wrote …` line now reports an absolute path.
+
+### Fixed (2026-07-06 — Repo hygiene session)
+- **`hmatc/src/driver.rs` — `find_clang()`.** Replaced the hardcoded
+  `C:\Program Files\LLVM\bin\clang.exe` fallback with an
+  `%ProgramFiles%`-resolved path on Windows, so the fallback keeps working
+  on any install drive/locale without baking in an absolute OS-specific
+  path. `PATH` lookup remains the primary strategy on every OS; the
+  fallback is only ever consulted on Windows.
+- **`hmatc/src/error.rs` — `ClangNotFound` message.** Now OS-neutral
+  ("install LLVM/clang and ensure `clang` is on your PATH").
+- Docs (`docs/toolchain.md`, `docs/getting-started.md`) updated to match.
 
 ### Next
 - Phase 2: functions, closures, structs (`shape`), sum types (`type`),

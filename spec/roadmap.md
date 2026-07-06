@@ -22,15 +22,15 @@ By v1.0, a developer should be able to:
 
 | Task                              | Status  | Notes                              |
 |-----------------------------------|---------|------------------------------------|
-| Rust workspace (hmatc)            | 🔲      | `cargo new --workspace`            |
-| Lexer — all tokens                | 🔲      | logos crate, indent/dedent         |
-| Parser — core AST nodes           | 🔲      | hand-rolled recursive descent      |
-| AST pretty-printer                | 🔲      | `--emit=ast` flag                  |
-| Error infrastructure              | 🔲      | thiserror, miette for display      |
-| CLI (hmatc)                       | 🔲      | clap, `--emit` flag                |
-| Test suite (lexer + parser)       | 🔲      | > 50 tests                         |
+| Rust workspace (hmatc)            | ✅      | `cargo new --workspace`            |
+| Lexer — all tokens                | ✅      | all Phase 0 tokens + indent/dedent |
+| Parser — core AST nodes           | ✅      | hand-rolled recursive descent, `[T]` generics, `or Fail`/`or nil` |
+| AST pretty-printer                | ✅      | `--emit=ast` flag                  |
+| Error infrastructure              | ✅      | thiserror-based `CompilerError`    |
+| CLI (hmatc)                       | ✅      | `--emit` flag                      |
+| Test suite (lexer + parser)       | ✅      | lexer + parser + type-checker suites |
 
-**Milestone marker:** `hmatc --emit=ast examples/hello_world.hm` prints AST without crashing.
+**Milestone marker:** ✅ `hmatc --emit=ast examples/hello_world.hm` prints AST without crashing.
 
 ---
 
@@ -39,18 +39,26 @@ By v1.0, a developer should be able to:
 
 | Task                              | Status  | Notes                              |
 |-----------------------------------|---------|------------------------------------|
-| Type checker — primitives         | 🔲      | int, float, str, bool, ()          |
-| Type checker — functions          | 🔲      | argument types, return types       |
-| Type inference — basic            | 🔲      | let binding inference              |
-| HIR (desugared AST)               | 🔲      | explicit types everywhere          |
-| LLVM IR codegen — primitives      | 🔲      | inkwell                            |
-| LLVM IR codegen — functions       | 🔲      | call conventions                   |
-| print() built-in                  | 🔲      | links to C printf                  |
-| main() entry point                | 🔲      | generates proper binary entry      |
-| Friendly error messages           | 🔲      | all errors have help messages      |
-| Integration test: hello world     | 🔲      | compiles and produces output       |
+| Type checker — primitives         | ✅      | int, float, str, bool              |
+| Type checker — functions          | ✅      | argument types, return types       |
+| Type inference — basic            | ✅      | let binding inference              |
+| HIR (desugared AST)               | ⏭️      | skipped — codegen walks the AST directly (see backend note) |
+| Codegen — primitives              | ✅      | via C backend, not LLVM IR (see backend note) |
+| Codegen — functions               | ✅      | via C backend, not LLVM IR (see backend note) |
+| print() built-in                  | ✅      | lowers to `printf`                 |
+| main() entry point                | ✅      | generates proper binary entry      |
+| Friendly error messages           | ✅      | errors carry codes + help text     |
+| Integration test: hello world     | ✅      | compiles and produces output       |
 
-**Milestone marker:** `hmatc hello.hm && ./hello` prints "Hello, HMAT!"
+**Milestone marker:** ✅ `hmatc examples/hello_world.hm` produces a native binary that prints "Hello, HMAT!"
+
+**Backend note:** Phase 1 shipped via a C codegen backend (AST → C source →
+system `clang`) rather than the originally planned LLVM IR / inkwell path —
+the available inkwell version could not locate a compatible LLVM toolchain at
+the time. `--emit=llvm-ir` is a placeholder pending an inkwell version that
+supports the installed LLVM. This is a proven bootstrapping strategy (early
+Rust and Haxe both did this) and is expected to be revisited once inkwell
+compatibility lands.
 
 ---
 
@@ -124,7 +132,24 @@ By v1.0, a developer should be able to:
 
 ---
 
-## Phase 5 — Community
+## Phase 5 — Data Science & ML (First-Class)
+**Goal:** Data science and ML are built into the language, not bolted on as packages.
+
+| Task                              | Status  | Notes                              |
+|-----------------------------------|---------|------------------------------------|
+| Tensor type + linalg + autograd   | 🔲      |                                    |
+| Frame (DataFrame) + query pipe    | 🔲      | pipe syntax over tabular data      |
+| learn module (classical ML)       | 🔲      |                                    |
+| nn module (neural networks)       | 🔲      | layers + optimizers                |
+| stats module                      | 🔲      | descriptive stats + tests + distributions |
+| plot module                       | 🔲      | visualization                      |
+| data module                       | 🔲      | loaders, augmentation, splits      |
+| nn.pretrained                     | 🔲      | ResNet, BERT, GPT2, CLIP, Whisper  |
+| AI + DS integration               | 🔲      | embed, enrich, explain             |
+
+---
+
+## Phase 6 — Community
 **Goal:** HMAT is ready for the world.
 
 | Task                              | Status  | Notes                              |
