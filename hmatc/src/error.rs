@@ -36,10 +36,7 @@ pub enum CompilerError {
 
     /// `clang` could not be located on this system. Phase 1 needs it to
     /// turn the emitted C source into a native binary.
-    #[error(
-        "clang not found — install LLVM and ensure `clang` is on PATH, \
-         or place it at `C:\\Program Files\\LLVM\\bin\\clang.exe`"
-    )]
+    #[error("clang not found — install LLVM/clang and ensure `clang` is on your PATH")]
     ClangNotFound,
 
     /// `clang` ran but exited with a non-zero status. The stderr from

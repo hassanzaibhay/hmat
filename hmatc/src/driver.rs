@@ -26,14 +26,33 @@ use std::path::{Path, PathBuf};
 use crate::CompilerError;
 
 /// Standard LLVM-on-Windows install location, used as a fallback when PATH
-/// lookup fails. Phase 1 documents this path explicitly in CLAUDE.md.
-const WINDOWS_CLANG_FALLBACK: &str = r"C:\Program Files\LLVM\bin\clang.exe";
+/// lookup fails. The official LLVM Windows installer does not add `clang` to
+/// PATH by default, so this fallback matters for a working out-of-the-box
+/// experience there. Resolved from `%ProgramFiles%` at runtime rather than
+/// hardcoded, so this stays correct on any Windows install drive/locale and
+/// contributes no OS-specific assumption on non-Windows platforms (where it
+/// is simply never consulted).
+#[cfg(windows)]
+fn platform_clang_fallback() -> Option<PathBuf> {
+    let program_files = std::env::var_os("ProgramFiles")?;
+    let candidate = Path::new(&program_files)
+        .join("LLVM")
+        .join("bin")
+        .join("clang.exe");
+    candidate.is_file().then_some(candidate)
+}
+
+#[cfg(not(windows))]
+fn platform_clang_fallback() -> Option<PathBuf> {
+    None
+}
 
 /// Locates `clang` and returns an absolute path to it.
 ///
 /// Lookup order:
 ///   1. walk `$PATH` manually (see [`find_on_path`]),
-///   2. the documented Windows fallback (`C:\Program Files\LLVM\bin\clang.exe`).
+///   2. on Windows only, the default LLVM install location under
+///      `%ProgramFiles%\LLVM\bin\clang.exe` (see [`platform_clang_fallback`]).
 ///
 /// Returns [`CompilerError::ClangNotFound`] when neither succeeds. The
 /// returned path is always absolute — callers must hand it to
@@ -42,9 +61,8 @@ pub fn find_clang() -> Result<PathBuf, CompilerError> {
     if let Some(p) = find_on_path("clang") {
         return Ok(p);
     }
-    let fallback = PathBuf::from(WINDOWS_CLANG_FALLBACK);
-    if fallback.is_absolute() && fallback.is_file() {
-        return Ok(fallback);
+    if let Some(p) = platform_clang_fallback() {
+        return Ok(p);
     }
     Err(CompilerError::ClangNotFound)
 }
